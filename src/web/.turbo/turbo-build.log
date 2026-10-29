@@ -1,0 +1,8 @@
+[0m[2m[35m$[0m [2m[1mtsc --noEmit && vite build[0m
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+[2K[32m✓[0m 15 modules transformed.
+[2Krendering chunks (1)...[2Kcomputing gzip size...
+[2K[2mdist/[0m[32mindex.html                [0m[1;2m  0.33 kB[0m[2m │ gzip:  0.23 kB[0m
+[2mdist/[0m[2massets/[0m[36mindex-CLrhsvf9.js  [0m[1;2m220.17 kB[0m[2m │ gzip: 68.90 kB[0m
+
+[32m✓ built in 81ms[39m

@@ -1,0 +1,12 @@
+{
+  "name": "@heisenberg/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "hono": "^4.13.14"
+  },
+  "scripts": {
+    "dev": "bun --hot src/index.ts"
+  }
+}

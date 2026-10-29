@@ -1,0 +1,17 @@
+{
+  "name": "heisenberg",
+  "private": true,
+  "packageManager": "bun@1.4.4",
+  "workspaces": [
+    "src/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "solo:backend": "bunx turbo run dev --filter=@heisenberg/api"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.10"
+  }
+}

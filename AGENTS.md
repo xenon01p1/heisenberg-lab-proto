@@ -274,6 +274,16 @@ Pause implementation and ask for approval when:
 
 When asking, provide **one specific question**, a recommended simple option, and the consequence of that choice. Do not ask about trivial implementation details that can be safely resolved by following existing patterns.
 
+## 18. Feature-based specifications (mandatory)
+
+- Read `docs/context/feature-documentation-rules.md` before planning or implementing any feature.
+- Each independently deliverable feature must have a dedicated specification under `docs/context/features/<feature-name>.md`, using `FEATURE-TEMPLATE.md` as a starting point.
+- A feature file must document its overview, explanation, goals, scope, workflows, business rules, functional specifications, technical touchpoints, acceptance criteria, expected outputs, implementation status, achievements, and unresolved questions.
+- Feature specifications describe intended behavior. Actual implementation history belongs in `docs/context/update/`; approved decisions belong in `docs/context/checkpoints/`; task progress belongs in `docs/context/tasks/`.
+- Do not implement a proposed or ambiguous feature without approval. Do not invent API contracts, schema, scoring rules, or framework choices.
+- Respect the approved stack: Bun runtime/package manager, Hono, Turborepo, Docker, React, Drizzle ORM/Kit, and PostgreSQL. Zod is used for shared contracts where already specified.
+- Prefer explicit, straightforward code over clever abstractions. Do not expand scope or change architecture without approval.
+
 ---
 
 **Guiding rule:** Build the smallest correct thing that satisfies the documented business requirement. Prefer explicit, boring, testable code over clever code. Protect the agreed architecture. Never invent requirements or verification results.
