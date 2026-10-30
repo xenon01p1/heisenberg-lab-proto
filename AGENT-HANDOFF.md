@@ -31,15 +31,14 @@ Read `AGENTS.md`, existing context documents, checkpoints, and the actual reposi
 - Passwords: use an established password-hashing algorithm (Argon2id preferred) with per-password salts, never plaintext or reversible encryption.
 - Sessions: unpredictable opaque session tokens, store only a hash of token in database, use HttpOnly Secure SameSite cookies as appropriate to deployment; define expiration and revocation; logout revokes server-side session.
 - Browser authentication: do not store bearer tokens in localStorage. Protect state-changing cookie-authenticated requests against CSRF according to same-site/cross-site deployment; do not assume SameSite alone covers every scenario.
-- Registration/login: validate input; prevent account enumeration where practical; add rate limiting or document a development-only limitation before public exposure. Do not log passwords or session tokens.
+- Registration/login: validate input; login failures remain generic; CP-004 explicitly accepts HTTP 409 for duplicate registration; add rate limiting or document a development-only limitation before public exposure. Do not log passwords or session tokens.
 - Authorization: derive account identity from server-verified session, not from userId/operatorId supplied by client. Scope user-owned records on every API query and mutation. `operators` are fictional game identities, not security principals.
 - Use Zod in `packages/contracts`; Hono in `src/api`; Drizzle schemas/migrations in `packages/db`; React in `src/web`; Bun and Turborepo. No extra frameworks without approval.
 - Never invent scoring algorithms, incident behavior, recipe versioning, equipment reservation/release, or state transitions.
 - Every task must have explicit acceptance criteria and tests; verify locally, report commands and actual results; update docs/context/update and move task to done only after completion.
 
 ## Owner decisions still required
-- Email/password policy and whether email verification is deferred (recommended deferred for local MVP, not production readiness).
-- Auth cookie deployment: same origin vs separate origins; HTTPS/proxy and CSRF mechanism.
+- Formal approval of CP-004 is required before Authentication implementation; its email/password, Argon2id, session, cookie, origin/CSRF, and duplicate-email decisions are recorded there.
 - Profile editable fields and whether changing email/password is in MVP.
 - Dashboard metrics definition and whether metrics are user-scoped (recommended yes).
 - Recipe read-only seeds vs editable; editing/versioning policy.

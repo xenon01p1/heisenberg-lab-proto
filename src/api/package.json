@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@heisenberg/contracts": "workspace:*",
     "@heisenberg/db": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14"
   },
   "scripts": {
-    "dev": "bun --env-file=../../.env --hot src/index.ts",
+    "dev": "bun --env-file=../../.env --hot src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

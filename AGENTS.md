@@ -51,7 +51,7 @@ Proposed context documents are not automatically approved requirements. Do not a
 | Local infrastructure | Docker / Docker Compose |
 | CI | GitHub Actions |
 
-**Not yet decided:** React build tooling/router, UI library, authentication approach, testing framework (Jest and Bun Test are candidates), deployment target, and specific database hosting. Do not assume Next.js, Vite, Tailwind, shadcn/ui, Vitest, Redis, or a cloud vendor is approved merely because it is popular. Propose a choice when a task requires one; wait for approval if it would establish a new architectural dependency.
+**Not yet decided:** React build tooling/router, UI library, deployment target, and specific database hosting. CP-003 approves persisted email/password authentication as product scope; CP-004 approves the V1 authentication security policy. Bun Test is approved for Authentication testing only. Do not assume Next.js, Vite, Tailwind, shadcn/ui, Vitest, Redis, or a cloud vendor is approved merely because it is popular. Propose a choice when a task requires one; wait for approval if it would establish a new architectural dependency.
 
 Use versions already pinned in the repository. Do not upgrade dependencies unless required by the active task or explicitly authorized.
 
@@ -105,7 +105,7 @@ Prefer business logic in `src/api` services or small pure functions. Hono handle
 - Add Redis, Kafka, Kubernetes, GraphQL, a state-management framework, or an ORM alternative without a demonstrated task requirement and approval.
 - Introduce a generic repository framework, dependency-injection container, plugin architecture, or reusable abstraction for hypothetical future use.
 - Change published API behavior, shared contract semantics, database ownership, or documented state transitions without an approved requirement.
-- Add authentication, payments, external integrations, analytics, or unrelated features as “helpful improvements.”
+- Add authentication, payments, external integrations, analytics, or unrelated features as “helpful improvements.” Persisted authentication is approved only within CP-003 and its approved task scope; unresolved security and deployment details still require owner approval.
 - Rewrite working modules, reformat unrelated files, or perform sweeping refactors during a focused task.
 
 If a protected change seems necessary, **do not implement it**. Explain the issue, minimal alternatives, tradeoffs, and what approval is needed.
@@ -181,7 +181,7 @@ Exact state names, transitions, scoring rules, timing, and event probabilities m
 - Never expose database credentials or direct database access to the browser.
 - Treat event history as append-only where required; corrections must not silently erase history.
 
-Do not generate database schema based solely on a proposed design if `docs/context/database-design.md` is missing or unapproved.
+Do not generate database schema based solely on a proposed design if `docs/context/database-design.md` is missing or unapproved. CP-003 approves the full-stack authentication/product scope, not the logical schema or migration details; those remain subject to the database-design approval gate.
 
 ## 11. Security and secrets
 
@@ -282,6 +282,7 @@ When asking, provide **one specific question**, a recommended simple option, and
 - Feature specifications describe intended behavior. Actual implementation history belongs in `docs/context/update/`; approved decisions belong in `docs/context/checkpoints/`; task progress belongs in `docs/context/tasks/`.
 - Do not implement a proposed or ambiguous feature without approval. Do not invent API contracts, schema, scoring rules, or framework choices.
 - Respect the approved stack: Bun runtime/package manager, Hono, Turborepo, Docker, React, Drizzle ORM/Kit, and PostgreSQL. Zod is used for shared contracts where already specified.
+- CP-003 is the owner-approved scope checkpoint for persisted authentication, accounts versus fictional operators, equipment catalog coverage, authenticated application UI, and full-stack completion. CP-004 is the approved security checkpoint for Authentication. Treat all other unresolved decisions as unresolved.
 - Prefer explicit, straightforward code over clever abstractions. Do not expand scope or change architecture without approval.
 
 ---

@@ -16,3 +16,5 @@ export async function checkDatabaseConnection() {
 const client = postgres(databaseUrl);
 
 export const db = drizzle({ client });
+
+export * from "./schema";

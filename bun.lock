@@ -35,7 +35,9 @@
       "name": "@heisenberg/api",
       "version": "0.0.1",
       "dependencies": {
+        "@heisenberg/contracts": "workspace:*",
         "@heisenberg/db": "workspace:*",
+        "drizzle-orm": "^0.45.4",
         "hono": "^4.13.14",
       },
       "devDependencies": {
@@ -46,6 +48,7 @@
       "name": "@heisenberg/web",
       "version": "0.0.1",
       "dependencies": {
+        "@heisenberg/contracts": "workspace:*",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
       },

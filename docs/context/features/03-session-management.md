@@ -2,7 +2,7 @@
 
 **Status:** Proposed specification — not authorization to implement
 **Owner approval:** Pending review
-**Related checkpoints:** CP-001 (PostgreSQL), CP-002 (turn-based V1)
+**Related checkpoints:** CP-001 (PostgreSQL), CP-002 (turn-based V1), CP-003 (full-stack V1 scope)
 **Related task:** `../tasks/ongoing/TASK-03-session-management.md`
 **Related updates:** None
 
@@ -16,7 +16,7 @@ Create and track fictional cooking sessions, associating a recipe and equipment 
 
 ## 3. Scope
 **In scope**
-- Create a session with a fictional recipe and selected equipment.
+- Create a user-owned session with a fictional recipe, seeded operator, and selected equipment only if the approved contract requires it.
 - List and inspect sessions.
 - Start, pause, resume, and abort only where approved transition rules permit.
 - Record session lifecycle events transactionally.
@@ -24,7 +24,7 @@ Create and track fictional cooking sessions, associating a recipe and equipment 
 **Out of scope**
 - Automatic timers and background progression (prohibited in V1 by CP-002).
 - Quality scoring, incident generation, and full step-advancement engine (separate features).
-- Authentication/roles until separately decided.
+- Authentication is a dependency, not an out-of-scope assumption; authorization uses the authenticated account, while operators remain fictional game personas.
 
 ## 4. User workflow
 1. User creates a draft session and selects a recipe/equipment.
@@ -36,11 +36,11 @@ Create and track fictional cooking sessions, associating a recipe and equipment 
 - CP-002: simulation is turn-based; nothing advances automatically.
 - Reject invalid state transitions with a clear domain error.
 - Changes to session state and event history must be atomic.
-- Concurrent requests must not bypass transition or equipment-allocation checks.
-- Exact state graph and equipment release semantics require a checkpoint before implementing those transitions.
+- Concurrent requests must not bypass approved transition or equipment-allocation checks.
+- Exact state graph, equipment selection/allocation/release semantics, and retry behavior require checkpoints before implementing those transitions.
 
 ## 6. Functional specifications
-- FR-001: Create and retrieve sessions with validated references.
+- FR-001: Create and retrieve only authenticated-user-owned sessions with validated recipe, operator, and approved equipment references.
 - FR-002: Expose session status and linked recipe/equipment.
 - FR-003: Enforce approved state transitions on the server.
 - FR-004: Record successful transitions in an append-only session event history.
@@ -56,10 +56,10 @@ Create and track fictional cooking sessions, associating a recipe and equipment 
 **Approved stack:** Bun runtime/package manager, Hono, Turborepo, Docker, React, Drizzle/Drizzle Kit, PostgreSQL, Zod contracts. Do not add frameworks without approval.
 
 ## 8. Acceptance criteria
-- [ ] Session creation validates referenced recipe/equipment.
+- [ ] Session creation validates referenced recipe/operator and equipment only if required by the approved contract.
 - [ ] An invalid transition does not alter database state.
 - [ ] A successful transition records one coherent state change and event.
-- [ ] Two concurrent starts cannot allocate the same equipment.
+- [ ] If reservation is approved, two concurrent starts cannot allocate the same equipment.
 - [ ] No session advances on a timer or page refresh.
 
 ## 9. Expected outputs
@@ -75,5 +75,5 @@ Create and track fictional cooking sessions, associating a recipe and equipment 
 ## 11. Open questions
 - Approve the exact state transition matrix before implementing actions.
 - When does equipment become reserved and released?
-- Are operators/users required for V1?
+- Which equipment selection/allocation/release rules are approved?
 - How should repeated requests be handled?

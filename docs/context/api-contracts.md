@@ -1,97 +1,101 @@
 # API Contracts — Heisenberg Lab
 
-**Status:** Proposed V1 HTTP interface — routes and payloads require owner approval before implementation.  
+**Status:** Proposed V1 HTTP interface — routes and payloads require owner approval before implementation.
 **Backend:** Hono. **Validation:** Zod in `packages/contracts`. **Transport:** JSON over HTTP.
 
 ## Conventions
-- Base path proposed: `/api`. No implicit `/v1` until approved.
+- Base path proposed: `/api`; no implicit `/v1` until approved.
 - IDs are UUID strings; times are ISO 8601 UTC strings; game score is integer 0–100 or `null`.
-- Server validates all request params/body; frontend must not be trusted for transitions or scoring.
+- Server validates every request and maps business errors intentionally; frontend validation is not authorization.
 - Success shape: `{ "data": ... }`; errors: `{ "error": { "code": "...", "message": "..." } }`.
-- Never expose database rows directly or internal stack traces.
-- No authentication in V1; seeded operators are **game identities**, not authenticated users. Do not present `operatorId` as security authorization.
+- Never expose database rows, password hashes, session tokens, or stack traces directly.
+- Authentication is persisted email/password account authentication. The authenticated account is distinct from the `operatorId` selected as fictional game data.
 
-## Proposed endpoints
-| Method | Path | Meaning | Expected success |
+## Authentication and account endpoints
+| Method | Path | Meaning | Auth |
 |---|---|---|---|
-| GET | `/api/recipes` | List published recipe versions | 200 |
-| GET | `/api/operators` | List seeded operators | 200 |
-| POST | `/api/sessions` | Create DRAFT session | 201 |
-| GET | `/api/sessions` | List sessions (basic pagination later) | 200 |
-| GET | `/api/sessions/:id` | Session with steps and current status | 200 |
-| POST | `/api/sessions/:id/prepare` | DRAFT -> READY | 200 |
-| POST | `/api/sessions/:id/start` | READY -> RUNNING | 200 |
-| POST | `/api/sessions/:id/advance` | Complete one step; maybe complete session | 200 |
-| POST | `/api/sessions/:id/pause` | RUNNING -> PAUSED | 200 |
-| POST | `/api/sessions/:id/resume` | PAUSED -> RUNNING | 200 |
-| POST | `/api/sessions/:id/abort` | DRAFT/READY/RUNNING/PAUSED -> ABORTED | 200 |
-| GET | `/api/sessions/:id/events` | Ordered event timeline | 200 |
-| GET | `/api/sessions/:id/report` | Terminal session summary | 200 |
+| POST | `/api/auth/register` | Create an account and establish a server session | Public |
+| POST | `/api/auth/login` | Verify credentials and establish a server session | Public |
+| POST | `/api/auth/logout` | Revoke the current server session | Authenticated |
+| GET | `/api/auth/me` | Return the safe current account profile; canonical current-user route | Authenticated |
 
-`fail` and `resolve-incident` endpoints are **deferred pending incident design**; don't implement speculative routes. `cancel` maps to `abort` for DRAFT/READY as proposed in business rules.
+Authentication uses a 7-day PostgreSQL-backed session, an HTTP-only host-only `SameSite=Lax` cookie, and `Secure=true` in production/HTTPS. Local development uses browser origin `http://localhost:5173` with the existing Vite `/api` proxy to Hono at `http://localhost:3000`. Production assumes one HTTPS origin for the React app and `/api`; its exact hostname must be configured in the Origin allowlist. Do not store bearer tokens in browser local storage.
 
-## Request examples
-Create session:
-```json
-{ "recipeId": "00000000-0000-4000-8000-000000000001", "operatorId": "00000000-0000-4000-8000-000000000002" }
-```
-Mutating command (except create):
-```json
-{ "expectedRevision": 3 }
-```
-`expectedRevision` is a **proposed** required field, pending checkpoint approval. For `pause`, an optional user-facing reason may be considered later; don't add until specified.
+## Authenticated application endpoints
+| Method | Path | Meaning | Auth |
+|---|---|---|---|
+| GET | `/api/dashboard/summary` | Return approved persisted user-scoped summary | Authenticated |
+| GET | `/api/recipes` | List recipes owned by the authenticated user | Authenticated |
+| POST | `/api/recipes` | Create an owned recipe with ordered steps | Authenticated |
+| GET | `/api/recipes/:id` | Read one owned recipe and ordered steps | Authenticated |
+| PATCH | `/api/recipes/:id` | Update an owned, unreferenced recipe and replace its steps | Authenticated |
+| DELETE | `/api/recipes/:id` | Delete an owned, unreferenced recipe | Authenticated |
+| GET | `/api/operators` | List seeded fictional operators | Per-feature visibility decision |
+| GET | `/api/equipment` | List the fictional equipment catalog | Per-feature visibility decision |
+| POST | `/api/sessions` | Create a user-owned DRAFT session | Authenticated |
+| GET | `/api/sessions` | List only the authenticated user's sessions | Authenticated |
+| GET | `/api/sessions/:id` | Read one owned session with steps/status | Authenticated |
+| POST | `/api/sessions/:id/prepare` | DRAFT -> READY if approved | Authenticated |
+| POST | `/api/sessions/:id/start` | READY -> RUNNING if approved | Authenticated |
+| POST | `/api/sessions/:id/advance` | Complete one step if approved | Authenticated |
+| POST | `/api/sessions/:id/pause` | RUNNING -> PAUSED if approved | Authenticated |
+| POST | `/api/sessions/:id/resume` | PAUSED -> RUNNING if approved | Authenticated |
+| POST | `/api/sessions/:id/abort` | Abort an allowed nonterminal session | Authenticated |
+| GET | `/api/sessions/:id/events` | Return the ordered owned event timeline | Authenticated |
+| GET | `/api/sessions/:id/report` | Return an owned terminal session summary | Authenticated |
 
-## Response examples
-Create or command success:
+`fail`, `resolve-incident`, equipment allocation, and release endpoints remain deferred pending their business decisions. Do not expose `userId` in request bodies as an ownership selector. `operatorId` is a domain selection, not authorization.
+
+## Request and response contracts
+Register/login request fields are email and password. Normalize email by trimming and lowercasing; accept passwords from 12 through 128 characters. Hash passwords with Bun's `Bun.password.hash` Argon2id configuration: `algorithm: "argon2id"`, `memoryCost: 65536` KiB, and `timeCost: 2` (Bun emits parallelism `p=1`). Verify with `Bun.password.verify`.
+
+A successful auth response returns a safe user object; the server establishes the session through the HTTP-only cookie. Duplicate registration returns HTTP `409` and does not create an account or session. Login failures use a generic response.
+
+For browser state-changing authentication requests and future cookie-authenticated state-changing requests, the server requires an `Origin` header matching the configured allowlist. Missing or unapproved Origin is rejected. Strict Origin validation is the V1 CSRF defense; no separate CSRF-token endpoint is defined.
+
+Recipe request bodies contain `title` and a non-empty `steps` array. Each step contains `label` and optional `description`; the server assigns deterministic one-based order from array order and does not accept client ownership. `PATCH` replaces the complete step list. Recipe mutations on session-referenced recipes return `422 BUSINESS_RULE_VIOLATION`. Create session may contain `recipeId`, `operatorId`, and `equipmentId` only if equipment selection is approved for that task. Mutating session commands may contain `expectedRevision` if the revision contract is approved; do not treat this proposal as a finalized contract.
+
+All public fields, nullability, validation limits, and response detail depth require Zod schemas and feature-level approval. Keep response envelopes and error codes stable unless a checkpoint changes them.
+
+### Dashboard summary response
+
+`GET /api/dashboard/summary` is authenticated and returns:
+
 ```json
 {
   "data": {
-    "id": "00000000-0000-4000-8000-000000000003",
-    "status": "RUNNING",
-    "revision": 4,
-    "recipeId": "00000000-0000-4000-8000-000000000001",
-    "operatorId": "00000000-0000-4000-8000-000000000002",
-    "qualityScore": null
+    "equipment": { "available": true, "count": 0 },
+    "recipes": { "available": true, "count": 0 },
+    "sessions": { "available": false, "count": null },
+    "completedSessions": { "available": false, "count": null },
+    "recentActivity": { "available": false, "items": [] }
   }
 }
 ```
-Error:
-```json
-{ "error": { "code": "INVALID_STATE_TRANSITION", "message": "Cannot resume a session that is not paused." } }
-```
-Examples illustrate shape, not proof of implemented endpoints. All public fields must have Zod schemas and documented nullability.
+
+The equipment count is the global catalog count because the current `equipment` table has no user ownership relationship. The recipe count is the authenticated user's owned recipe count under CP-005. Session, completed-session, and recent-activity values remain explicitly unavailable until their feature tables and approved queries exist; clients must not reinterpret unavailable values as zero or fabricated activity.
 
 ## Error mapping
 | HTTP | Code | Example |
 |---|---|---|
-| 400 | `VALIDATION_ERROR` | Invalid UUID/body |
-| 404 | `NOT_FOUND` | Unknown session/recipe |
-| 409 | `INVALID_STATE_TRANSITION` | Start completed session |
-| 409 | `REVISION_CONFLICT` | Stale expectedRevision |
-| 409 | `BLOCKING_INCIDENT` | Resume before resolution (if incidents approved) |
-| 422 | `BUSINESS_RULE_VIOLATION` | Recipe has no steps |
+| 400 | `VALIDATION_ERROR` | Invalid request body or UUID |
+| 401 | `UNAUTHENTICATED` | Missing, expired, or revoked session |
+| 403 | `FORBIDDEN` | Authenticated user does not own the record |
+| 404 | `NOT_FOUND` | Unknown or inaccessible resource |
+| 409 | `INVALID_STATE_TRANSITION` | Start a terminal session |
+| 409 | `REVISION_CONFLICT` | Stale expected revision, if approved |
+| 409 | `BLOCKING_INCIDENT` | Resume before resolution, if approved |
+| 409 | `EMAIL_ALREADY_REGISTERED` | Normalized registration email already exists |
+| 422 | `BUSINESS_RULE_VIOLATION` | Recipe has no steps or is immutable after session reference |
 | 500 | `INTERNAL_ERROR` | Unexpected failure; details logged server-side |
 
 ## Behavioral guarantees
-- Every mutation checks the current persisted state; never trust UI controls alone.
-- A successful advance completes **one** step; concurrent commands with same revision cannot both advance.
-- Transaction commits state/step updates and event append together.
-- Return updated revision after each successful command.
-- List and detail endpoints never mutate state.
-- Reports use persisted data; unavailable report behavior should be confirmed (`409` until terminal is proposed).
-- V1 pagination, filtering, and response detail depth are deliberately minimal; approve them per task.
+- Protected handlers derive identity from server-verified authentication and scope every user-owned query and mutation.
+- A successful state mutation changes persisted state and appends its event in one transaction.
+- List/detail endpoints do not mutate state.
+- Reports use persisted data; terminal eligibility and exact fields remain per-feature decisions.
 
-## Contract ownership
-- Zod schemas and exported types: `packages/contracts`.
-- Hono route validation and HTTP mapping: `src/api`.
-- Business decisions: `src/api` services.
-- Browser uses public contracts only, not DB models.
+## Contract ownership and pending approvals
+Zod schemas and public types belong in `packages/contracts`; Hono validation/mapping belongs in `src/api`; business decisions belong in services; browser code uses public contracts only.
 
-## Pending checkpoints
-- Approve base path and endpoint list.
-- Approve response envelopes and error codes.
-- Approve revision-based mutation payloads; decide whether request idempotency keys are needed.
-- Approve report eligibility and exact detail/list response fields.
-- Approve incident workflow before introducing incident commands.
-
-Decisions belong in `docs/checkpoints/`; shipped-feature logs belong in `docs/update/`.
+The authentication decisions are recorded in CP-004. Remaining API decisions are the base path, endpoint visibility, response envelopes/error codes outside Authentication, revision/idempotency contract, dashboard metrics, and incident workflow.

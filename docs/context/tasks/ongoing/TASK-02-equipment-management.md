@@ -3,7 +3,7 @@
 **Status:** Proposed / awaiting assignment
 **Feature specification:** `../../features/02-equipment-management.md`
 **Dependencies:** TASK-01 (recipe browsing is not a runtime dependency, but implement foundation first)
-**Decision constraints:** CP-001 PostgreSQL approved; CP-002 turn-based V1 approved. Do not implement unresolved rules without owner approval.
+**Decision constraints:** CP-001 PostgreSQL, CP-002 turn-based V1, and CP-003 full-stack scope are approved checkpoints. Equipment catalog coverage is approved; allocation, condition, and release rules remain unresolved. Do not implement unresolved rules without owner approval.
 
 ## Objective
 Implement only the approved V1 subset of `02-equipment-management.md`, with readable code and clear boundaries.

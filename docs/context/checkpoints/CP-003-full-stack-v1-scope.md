@@ -20,7 +20,7 @@
 - Cookie/CSRF deployment details, password recovery and email verification policy.
 - Editable profile fields and account-management scope.
 - Dashboard metric definitions.
-- Recipe create/edit/delete and versioning policy.
+- Recipe create/edit/delete and versioning policy were unresolved here and are superseded for Recipe Management V1 by CP-005. V1 uses owner-scoped mutable recipes that become immutable after session reference; no publication workflow or version history.
 - Equipment status/condition vocabulary, allocation/release rules.
 - Session transition matrix, idempotency/revision handling, incident and scoring rules.
 - UI routing, styling framework, component library, and final visual tokens.

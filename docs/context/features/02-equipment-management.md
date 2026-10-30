@@ -10,15 +10,15 @@
 Track fictional lab equipment as simulation resources, including availability and a simple condition indicator.
 
 ## 2. Goals
-- Make equipment assignment visible and understandable.
-- Prevent conflicting use of the same equipment by active sessions.
+- Make the fictional equipment catalog and any approved session selection visible and understandable.
+- Preserve a place for conflict protection if reservation is approved.
 - Keep equipment state changes auditable through session events where relevant.
 
 ## 3. Scope
 **In scope**
 - List equipment and its current availability.
-- Select available equipment when configuring a session.
-- Reflect assignment and release during session lifecycle actions.
+- Select equipment when configuring a session if the approved session contract requires it.
+- Reflect assignment and release during session lifecycle actions only after those semantics are approved.
 
 **Out of scope**
 - Real-world maintenance procedures, hardware integration, IoT, and telemetry.
@@ -31,16 +31,16 @@ Track fictional lab equipment as simulation resources, including availability an
 4. System releases equipment according to the approved lifecycle rules.
 
 ## 5. Business rules and edge cases
-- Equipment cannot be assigned to two simultaneously active sessions.
-- Database transaction/concurrency protection is required, not just a frontend check.
+- If reservation is approved, equipment cannot be assigned to two simultaneously active sessions.
+- If reservation is approved, database transaction/concurrency protection is required, not just a frontend check.
 - Definition of active occupancy and release behavior for PAUSED/FAILED/ABORTED requires approval.
 - Condition values and maintenance actions are not approved yet.
 
 ## 6. Functional specifications
 - FR-001: Display equipment identity and availability.
-- FR-002: Reject a conflicting equipment allocation when a session begins.
-- FR-003: Show allocation changes after successful session actions.
-- FR-004: Protect concurrent starts from double-booking.
+- FR-002: Show selection and availability according to the approved equipment policy.
+- FR-003: If allocation is approved, reject a conflicting allocation when the approved lifecycle action occurs.
+- FR-004: If allocation is approved, protect concurrent lifecycle actions from double-booking.
 
 ## 7. Technical touchpoints
 - React: equipment list and selection control.
@@ -68,6 +68,7 @@ Track fictional lab equipment as simulation resources, including availability an
 - **Updates:** Add a dated entry to `../update/` only after implementation.
 
 ## 11. Open questions
+- Is V1 catalog-only, or is equipment required/selected for sessions?
 - Does PAUSED continue reserving equipment?
 - Can equipment be disabled manually?
 - What conditions/statuses are needed in V1?

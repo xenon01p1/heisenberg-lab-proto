@@ -53,6 +53,7 @@ Drizzle database access (packages/db)
        |
 PostgreSQL (approved database choice; schema pending approval)
 ```
+- Authentication is server-managed and persisted in PostgreSQL. The browser may hold only the approved cookie-based session state; it never receives database access or treats a client-supplied account/operator ID as authorization.
 - `src/web` may import `packages/contracts` only from shared packages; it must never import `packages/db` or server modules.
 - `src/api` may import `packages/contracts` and `packages/db`.
 - `packages/contracts` must not depend on application or database packages.
@@ -60,7 +61,7 @@ PostgreSQL (approved database choice; schema pending approval)
 - Keep server-only secrets and database access outside browser bundles.
 
 ## Responsibilities
-**Web:** display server state, collect input, handle loading/error/empty states; no authoritative business transitions.  
+**Web:** display server state, collect input, handle loading/error/empty states, and provide registration/login plus the authenticated application shell; no authoritative business transitions or authorization.
 **API routes:** parse and validate requests, map service results to HTTP responses.  
 **Services:** enforce session rules, coordinate transactions, invoke deterministic simulation functions.  
 **Contracts:** shared request/response schemas and public types, not database entities.  

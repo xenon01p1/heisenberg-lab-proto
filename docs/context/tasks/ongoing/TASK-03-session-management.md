@@ -2,8 +2,8 @@
 
 **Status:** Proposed / awaiting assignment
 **Feature specification:** `../../features/03-session-management.md`
-**Dependencies:** TASK-01 and TASK-02
-**Decision constraints:** CP-001 PostgreSQL approved; CP-002 turn-based V1 approved. Do not implement unresolved rules without owner approval.
+**Dependencies:** Authentication, TASK-01, and TASK-02
+**Decision constraints:** CP-001 PostgreSQL, CP-002 turn-based V1, and CP-003 full-stack scope are approved checkpoints. Sessions are user-owned and operators are fictional personas; equipment allocation/release and exact lifecycle/retry rules remain unresolved. Do not implement unresolved rules without owner approval.
 
 ## Objective
 Implement only the approved V1 subset of `03-session-management.md`, with readable code and clear boundaries.

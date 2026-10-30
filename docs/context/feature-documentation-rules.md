@@ -25,6 +25,9 @@ Every independently deliverable product feature must have one dedicated specific
 - `docs/context/business-rules.md`: Shared, cross-feature business invariants; avoid duplicating them.
 - `docs/context/api-contracts.md` and `database-design.md`: Cross-feature canonical interface and schema definitions.
 
+## Full-stack completion rule
+For an approved end-user feature, “implemented” means the approved behavior is usable through the React UI and supported by the Hono API, shared validation, persistence where relevant, focused tests, and documented verification. A backend-only or contract-only subtask may be completed when explicitly scoped that way, but it must not mark the whole end-user feature complete. Do not claim integration coverage when only one layer was verified.
+
 ## Agent requirements
 - Inspect the repository and read `AGENTS.md`, applicable context, feature spec, and checkpoints before work.
 - Never interpret a proposed feature spec as approval to implement it.
