@@ -18,7 +18,7 @@ Implement only the approved V1 subset of `01-recipe-management.md`, with readabl
 1. Agree on feature-specific business behavior and acceptance criteria.
 2. Implement minimal Drizzle/PostgreSQL schema or migration changes if needed.
 3. Implement shared Zod contracts and Hono endpoints if approved.
-4. Implement the smallest useful React interface if approved.
+4. Every feature must include its backend implementation, database changes where necessary, and a functional React frontend. A task is not considered complete until users can interact with the feature through the web interface.
 5. Add relevant tests using an owner-approved test framework.
 6. Run available verification commands; document actual outcomes.
 7. Update the feature's implementation section; move this task to `tasks/done/` only when complete; add dated `docs/context/update/` entry.

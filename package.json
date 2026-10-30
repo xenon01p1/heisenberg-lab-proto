@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "solo:backend": "bunx turbo run dev --filter=@heisenberg/api"
+    "solo:backend": "bunx turbo run dev --filter=@heisenberg/api",
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "turbo": "^2.11.10"
+    "turbo": "^2.11.10",
+    "typescript": "^7.0.2"
   }
 }

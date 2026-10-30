@@ -8,12 +8,14 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.4",
     "drizzle-kit": "^0.31.11"
   },
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
+    "typecheck": "tsc --noEmit",
     "db:generate": "bun --env-file=../../.env run drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env run drizzle-kit migrate",
     "db:studio": "bun --env-file=../../.env run drizzle-kit studio"
