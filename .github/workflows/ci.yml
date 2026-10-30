@@ -6,8 +6,26 @@ on:
 
 jobs:
   typecheck:
-    name: TypeScript Check
+    name: TypeScript Check & Tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: heisenberg
+          POSTGRES_PASSWORD: heisenberg_dev
+          POSTGRES_DB: heisenberg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U heisenberg -d heisenberg_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://heisenberg:heisenberg_dev@127.0.0.1:5432/heisenberg_test
 
     steps:
       - name: Checkout repository
@@ -23,6 +41,10 @@ jobs:
 
       - name: Typecheck monorepo
         run: bun run typecheck
+
+      - name: Run database migrations
+        working-directory: packages/db
+        run: bunx drizzle-kit migrate
 
       - name: Run tests
         run: bun test
