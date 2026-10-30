@@ -33,15 +33,15 @@ export const dashboardMetricSchema = z.object({
   count: z.number().int().nonnegative().nullable(),
 });
 
+export const dashboardActivityItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  occurredAt: z.iso.datetime(),
+});
+
 export const dashboardActivitySchema = z.object({
   available: z.boolean(),
-  items: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-      occurredAt: z.iso.datetime(),
-    }),
-  ),
+  items: z.array(dashboardActivityItemSchema),
 });
 
 export const dashboardSummarySchema = z.object({
@@ -58,6 +58,8 @@ export type AuthCredentials = z.infer<typeof authCredentialsSchema>;
 export type PublicUser = z.infer<typeof publicUserSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type DashboardMetric = z.infer<typeof dashboardMetricSchema>;
+export type DashboardActivityItem = z.infer<typeof dashboardActivityItemSchema>;
+export type DashboardActivity = z.infer<typeof dashboardActivitySchema>;
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 
 export const recipeStepInputSchema = z.object({

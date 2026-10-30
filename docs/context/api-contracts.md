@@ -76,14 +76,14 @@ All public fields, nullability, validation limits, and response detail depth req
   "data": {
     "equipment": { "available": true, "count": 0 },
     "recipes": { "available": true, "count": 0 },
-    "sessions": { "available": false, "count": null },
-    "completedSessions": { "available": false, "count": null },
-    "recentActivity": { "available": false, "items": [] }
+    "sessions": { "available": true, "count": 0 },
+    "completedSessions": { "available": true, "count": 0 },
+    "recentActivity": { "available": true, "items": [] }
   }
 }
 ```
 
-The equipment count is the authenticated user's owned inventory count under CP-006. The recipe count is the authenticated user's owned recipe count under CP-005. Session, completed-session, and recent-activity values remain explicitly unavailable until their feature tables and approved queries exist; clients must not reinterpret unavailable values as zero or fabricated activity.
+The equipment count is the authenticated user's owned inventory count under CP-006. The recipe count is the authenticated user's owned recipe count under CP-005. The session count is the authenticated user's owned sessions count under CP-007. The completed-session count is the authenticated user's owned sessions with COMPLETED status. The recent-activity list contains the authenticated user's latest session lifecycle and turn events (up to 8) ordered newest first, with human-readable labels including recipe title context and ISO timestamps. When unsupported or unavailable, metrics return explicit `available: false` and `count: null` (or `items: []`); clients must not reinterpret unavailable values as zero or fabricated activity.
 
 ## Error mapping
 | HTTP | Code | Example |

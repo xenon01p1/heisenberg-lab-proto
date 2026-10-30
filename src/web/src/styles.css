@@ -556,6 +556,11 @@ button:disabled {
   padding: 0.35rem 0;
 }
 
+.activity-time {
+  color: #7f929f;
+  font-size: 0.8rem;
+}
+
 .quick-link-grid {
   display: flex;
   flex-wrap: wrap;

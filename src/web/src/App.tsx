@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { dashboardSummarySchema, publicUserSchema, type DashboardSummary, type Equipment, type Operator, type PublicUser, type Recipe, type RecipeStepInput, type Session, type SessionProgress, type SimulationAction } from "@heisenberg/contracts";
-import { dashboardHasAvailableActivity, dashboardMetricDescription, dashboardMetricValue } from "./dashboard";
+import { dashboardHasAvailableActivity, dashboardMetricDescription, dashboardMetricValue, formatActivityTime } from "./dashboard";
 import { getProfileFields } from "./profile";
 import { emptyRecipeStep, recipeFromPayload, recipesFromPayload } from "./recipes";
 import { equipmentFromPayload, equipmentItemFromPayload } from "./equipment";
@@ -977,13 +977,13 @@ function DashboardView({
       id: "sessions",
       label: "Sessions",
       metric: summary.sessions,
-      description: dashboardMetricDescription(summary.sessions, "Your active sessions", "Session feature not available yet"),
+      description: dashboardMetricDescription(summary.sessions, "Your sessions", "Session data unavailable"),
     },
     {
       id: "completed-sessions",
       label: "Completed sessions",
       metric: summary.completedSessions,
-      description: dashboardMetricDescription(summary.completedSessions, "Your completed sessions", "Session history not available yet"),
+      description: dashboardMetricDescription(summary.completedSessions, "Your completed sessions", "Session history unavailable"),
     },
   ];
 
@@ -1008,8 +1008,15 @@ function DashboardView({
         </div>
         {dashboardHasAvailableActivity(summary) ? (
           <ul className="activity-list">
-            {summary.recentActivity.items.map((item) => <li key={item.id}>{item.label}</li>)}
+            {summary.recentActivity.items.map((item) => (
+              <li key={item.id}>
+                <span>{item.label}</span>
+                <span className="activity-time"> · {formatActivityTime(item.occurredAt)}</span>
+              </li>
+            ))}
           </ul>
+        ) : summary.recentActivity.available ? (
+          <p className="muted">No recent activity yet. Start or advance a session to record activity.</p>
         ) : (
           <p className="muted">Recent activity will appear when session history is available.</p>
         )}

@@ -1,6 +1,5 @@
-import { sql } from "drizzle-orm";
-import { db, equipment, recipes } from "@heisenberg/db";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { db, equipment, recipes, sessionEvents, sessions } from "@heisenberg/db";
 
 export async function getDashboardSummary(userId: string) {
   const [equipmentResult] = await db
@@ -11,6 +10,28 @@ export async function getDashboardSummary(userId: string) {
     .select({ count: sql<number>`count(*)::int` })
     .from(recipes)
     .where(eq(recipes.userId, userId));
+  const [sessionResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sessions)
+    .where(eq(sessions.userId, userId));
+  const [completedSessionResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sessions)
+    .where(and(eq(sessions.userId, userId), eq(sessions.status, "COMPLETED")));
+  const activityRows = await db
+    .select({
+      id: sessionEvents.id,
+      action: sessionEvents.action,
+      toStatus: sessionEvents.toStatus,
+      createdAt: sessionEvents.createdAt,
+      recipeTitle: recipes.title,
+    })
+    .from(sessionEvents)
+    .innerJoin(sessions, eq(sessionEvents.sessionId, sessions.id))
+    .leftJoin(recipes, eq(sessions.recipeId, recipes.id))
+    .where(eq(sessions.userId, userId))
+    .orderBy(desc(sessionEvents.createdAt))
+    .limit(8);
 
   return {
     equipment: {
@@ -22,16 +43,22 @@ export async function getDashboardSummary(userId: string) {
       count: recipeResult?.count ?? 0,
     },
     sessions: {
-      available: false,
-      count: null,
+      available: true,
+      count: sessionResult?.count ?? 0,
     },
     completedSessions: {
-      available: false,
-      count: null,
+      available: true,
+      count: completedSessionResult?.count ?? 0,
     },
     recentActivity: {
-      available: false,
-      items: [],
+      available: true,
+      items: activityRows.map((activity) => ({
+        id: activity.id,
+        label: activity.recipeTitle
+          ? `${activity.recipeTitle} — ${activity.action} · ${activity.toStatus}`
+          : `${activity.action} · ${activity.toStatus}`,
+        occurredAt: activity.createdAt.toISOString(),
+      })),
     },
   };
 }

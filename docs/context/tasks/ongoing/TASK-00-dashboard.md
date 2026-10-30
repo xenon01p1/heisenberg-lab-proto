@@ -44,14 +44,16 @@ Read AGENTS.md, CP-003, CP-004, UI context, API contracts, database design, Auth
 ### Completed
 
 - Read the governing instructions, approved checkpoints, Dashboard documentation, API contracts, database design, and current implementation.
-- Confirmed the current database has only the existing global `equipment` catalog plus authentication tables; recipes and sessions are not available for dashboard aggregation.
-- Updated the Dashboard feature/task specifications with explicit supported and unavailable metric behavior.
-- Finalized the owner-confirmed Profile task without changing its functionality.
-- Added the shared dashboard summary Zod contract with explicit available/unavailable metric states.
-- Added protected `GET /dashboard/summary` backed by a real PostgreSQL count of the existing equipment catalog.
-- Added focused dashboard API tests for unauthenticated access, real equipment count, and unavailable metrics.
-- Integrated Dashboard into the existing shell with metric cards, unavailable activity state, quick navigation, loading/error/retry handling, and expired-session handling.
-- Added frontend dashboard presentation helpers/tests and responsive dashboard styling without new dependencies.
+- Confirmed that recipes, equipment, sessions, and session event tables exist and are user-owned under CP-005, CP-006, CP-007, and CP-008.
+- Updated the dashboard summary backend query in `src/api/src/dashboard.ts` to compute real user-scoped counts for equipment, recipes, sessions, completed sessions, and recent session events.
+- Joined recent activity with recipes to display contextual labels (`<recipeTitle> — <action> · <toStatus>`) and ISO timestamps for up to 8 recent user-owned events.
+- Updated shared contracts in `packages/contracts/src/index.ts` to export `dashboardActivityItemSchema`, `DashboardActivityItem`, and `DashboardActivity`.
+- Updated `src/web/src/dashboard.ts` to format activity timestamps (`formatActivityTime`) and detect available activity.
+- Updated `src/web/src/App.tsx` DashboardView to render real user-owned session and completed session metrics, formatted recent activity, and clear empty states for metrics and activity history.
+- Added styling for `.activity-time` in `src/web/src/styles.css`.
+- Expanded `src/web/src/dashboard.test.ts` to verify available zero/non-zero metrics, empty activity, and timestamp formatting.
+- Expanded `src/api/src/dashboard.test.ts` to verify unauthenticated access, empty new-user states, real simulation progression to completion, and strict user isolation.
+- Verified proper cleanup of test entities in `afterAll` respecting foreign key constraints.
 
 ### In Progress
 
@@ -59,23 +61,22 @@ Read AGENTS.md, CP-003, CP-004, UI context, API contracts, database design, Auth
 
 ### Remaining
 
-- Perform and record browser verification for real equipment count, unavailable states, quick navigation, loading/error/retry, and expired-session behavior.
+- Perform and record browser verification for real equipment count, recipe count, sessions, completed sessions, recent activity, empty states, quick navigation, loading/error/retry, and expired-session behavior.
 - Update the feature completion record and move this task to `done/` only after all criteria pass.
 
 ### Last Verification
 
-- TypeScript: Passed with the repository's Bun 1.4.4 container; all four workspace typecheck tasks passed.
-- Tests: Passed with Bun Test; 12 tests passed with 40 expectations across authentication, profile, and dashboard tests.
-- Build: Passed with the repository's Bun 1.4.4 container; the web production build completed successfully through Turbo.
-- Browser: Not completed; the shared page resolves to `chrome-error://chromewebdata/`.
-- Database/migrations: No schema changes planned or run.
+- TypeScript: Passed with `bun run typecheck` (`turbo run typecheck` across all 4 packages).
+- Tests: Passed with Bun Test; 32 tests passed with 170 expectations across all test files.
+- Build: Passed with `bun run build` (`turbo run build`).
+- Database/migrations: Existing schema preserved; no new migrations needed.
 
 ### Files Changed
 
+- `docs/context/api-contracts.md`
 - `docs/context/features/00-dashboard.md`
 - `docs/context/tasks/ongoing/TASK-00-dashboard.md`
 - `packages/contracts/src/index.ts`
-- `src/api/src/index.ts`
 - `src/api/src/dashboard.ts`
 - `src/api/src/dashboard.test.ts`
 - `src/web/src/App.tsx`
@@ -85,11 +86,10 @@ Read AGENTS.md, CP-003, CP-004, UI context, API contracts, database design, Auth
 
 ### Known Issues
 
-- Recipe/session/completed-session/recent-activity data is unavailable until their feature schemas and rules are implemented.
 - Browser verification is pending in a reachable local browser.
 
 ### Resume Instructions
 
 - Continue using the existing shell, Authentication, Profile, contracts, and database schema; do not create unrelated tables or migrations.
-- Keep unavailable metrics explicit and never substitute fake zeroes or activity.
+- Maintain strict user isolation across all dashboard aggregation queries.
 - Update this section after each meaningful milestone and leave the task in `ongoing/` until browser verification is recorded.
