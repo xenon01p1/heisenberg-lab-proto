@@ -3,10 +3,12 @@ import {
   db,
   recipeSteps,
   recipes,
+  sessions,
 } from "@heisenberg/db";
 import type { Recipe, RecipeInput } from "@heisenberg/contracts";
 
 export class RecipeNotFoundError extends Error {}
+export class RecipeInUseError extends Error {}
 
 function toRecipe(
   recipe: typeof recipes.$inferSelect,
@@ -101,6 +103,13 @@ export async function updateRecipe(
       throw new RecipeNotFoundError();
     }
 
+    const [reference] = await tx
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.recipeId, recipeId))
+      .limit(1);
+    if (reference) throw new RecipeInUseError();
+
     const [updatedRecipe] = await tx
       .update(recipes)
       .set({ title: input.title, updatedAt: new Date() })
@@ -129,6 +138,13 @@ export async function updateRecipe(
 }
 
 export async function deleteRecipe(userId: string, recipeId: string): Promise<void> {
+  const [reference] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.recipeId, recipeId))
+    .limit(1);
+  if (reference) throw new RecipeInUseError();
+
   const deleted = await db
     .delete(recipes)
     .where(and(eq(recipes.id, recipeId), eq(recipes.userId, userId)))

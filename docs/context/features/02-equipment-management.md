@@ -1,24 +1,22 @@
 # Feature: Equipment Management
 
-**Status:** Proposed specification — not authorization to implement
-**Owner approval:** Pending review
-**Related checkpoints:** CP-001 (PostgreSQL), CP-002 (turn-based V1)
+**Status:** Approved for V1 implementation under CP-006
+**Owner approval:** Approved 2026-10-30
+**Related checkpoints:** CP-001 (PostgreSQL), CP-002 (turn-based V1), CP-003 (full-stack V1 scope), CP-006 (Equipment Management V1)
 **Related task:** `../tasks/ongoing/TASK-02-equipment-management.md`
-**Related updates:** None
+**Related updates:** `../update/2026-10-30-equipment-management.md`
 
 ## 1. Overview
-Track fictional lab equipment as simulation resources, including availability and a simple condition indicator.
+Track user-owned fictional equipment inventory, including name, type, condition, and an inventory availability flag.
 
 ## 2. Goals
-- Make the fictional equipment catalog and any approved session selection visible and understandable.
-- Preserve a place for conflict protection if reservation is approved.
-- Keep equipment state changes auditable through session events where relevant.
+- Make each user's fictional equipment inventory visible and understandable.
+- Keep reservation and release decisions scoped to Session Management.
 
 ## 3. Scope
 **In scope**
-- List equipment and its current availability.
-- Select equipment when configuring a session if the approved session contract requires it.
-- Reflect assignment and release during session lifecycle actions only after those semantics are approved.
+- Create, list, inspect, update, and delete owned equipment inventory.
+- Validate name, type, condition, and availability.
 
 **Out of scope**
 - Real-world maintenance procedures, hardware integration, IoT, and telemetry.
@@ -31,44 +29,45 @@ Track fictional lab equipment as simulation resources, including availability an
 4. System releases equipment according to the approved lifecycle rules.
 
 ## 5. Business rules and edge cases
-- If reservation is approved, equipment cannot be assigned to two simultaneously active sessions.
-- If reservation is approved, database transaction/concurrency protection is required, not just a frontend check.
-- Definition of active occupancy and release behavior for PAUSED/FAILED/ABORTED requires approval.
-- Condition values and maintenance actions are not approved yet.
+- Equipment is visible only to its owning authenticated account.
+- `available` is an inventory flag and is not a reservation or occupancy guarantee.
+- Type and condition are validated labels; V1 does not define enum values or maintenance actions.
+- Unknown or inaccessible IDs return a controlled not-found response.
 
 ## 6. Functional specifications
-- FR-001: Display equipment identity and availability.
-- FR-002: Show selection and availability according to the approved equipment policy.
-- FR-003: If allocation is approved, reject a conflicting allocation when the approved lifecycle action occurs.
-- FR-004: If allocation is approved, protect concurrent lifecycle actions from double-booking.
+- FR-001: Display the authenticated user's equipment identity, type, condition, and availability.
+- FR-002: Allow authenticated owners to create, edit, and delete equipment.
+- FR-003: Reject malformed values and unauthorized access without mutating data.
+- FR-004: Defer reservation, release, and concurrent allocation behavior to Session Management.
 
 ## 7. Technical touchpoints
-- React: equipment list and selection control.
-- Hono: equipment read API proposed; allocation performed through session actions.
-- Zod: equipment and allocation-related contracts.
-- Drizzle/PostgreSQL: `equipment` and session reference; transaction and constraint design to be reviewed.
+- React: responsive equipment list and editor.
+- Hono: authenticated owner-scoped equipment CRUD API.
+- Zod: equipment request and response contracts.
+- Drizzle/PostgreSQL: additive ownership and inventory fields on `equipment`; no session allocation fields.
 - Dependencies: Session Management for lifecycle integration.
 
 **Approved stack:** Bun runtime/package manager, Hono, Turborepo, Docker, React, Drizzle/Drizzle Kit, PostgreSQL, Zod contracts. Do not add frameworks without approval.
 
 ## 8. Acceptance criteria
-- [ ] Equipment list reflects actual stored state.
-- [ ] Concurrent attempts to start with one equipment item cannot both succeed.
-- [ ] Rejected allocation does not partially change session state.
-- [ ] Allocation/release behavior follows an approved lifecycle checkpoint.
+- [ ] Equipment list reflects actual stored owner-scoped state.
+- [ ] Create, read, update, and delete work through the React interface and API.
+- [ ] Name, type, condition, and availability are persisted and validated.
+- [ ] Another user cannot read or mutate the equipment item.
+- [ ] Empty states, malformed IDs, invalid input, network errors, and expired sessions are handled.
+- [ ] Reservation/release is not implemented and remains deferred to Session Management.
+- [ ] Tests, type checks, production build, migration verification, and browser integration are recorded.
 
 ## 9. Expected outputs
 - Equipment list and status indicators.
 - Validated equipment association with sessions and conflict responses.
 
 ## 10. Implementation and achievements
-- **Implemented:** Not started.
-- **Verification:** Not run.
-- **Actual outputs:** None yet.
-- **Updates:** Add a dated entry to `../update/` only after implementation.
+- **Implemented:** Backend, database, shared contracts, frontend, and focused tests implemented under CP-006.
+- **Verification:** Full workspace typecheck, full Bun test suite, production build, and additive PostgreSQL migration verification passed. Browser verification is pending because the shared browser page is unavailable in the current environment.
+- **Actual outputs:** Owner-scoped equipment CRUD with persisted name, type, condition, and inventory availability, integrated into the Application Shell.
+- **Updates:** See `../update/2026-10-30-equipment-management.md`.
 
 ## 11. Open questions
-- Is V1 catalog-only, or is equipment required/selected for sessions?
-- Does PAUSED continue reserving equipment?
-- Can equipment be disabled manually?
-- What conditions/statuses are needed in V1?
+- Session Management must define whether and how equipment is selected, reserved, occupied, and released.
+- Future condition vocabulary and maintenance workflows remain outside this task.

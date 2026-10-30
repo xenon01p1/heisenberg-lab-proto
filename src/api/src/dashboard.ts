@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 export async function getDashboardSummary(userId: string) {
   const [equipmentResult] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(equipment);
+    .from(equipment)
+    .where(eq(equipment.userId, userId));
   const [recipeResult] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(recipes)

@@ -1,6 +1,6 @@
 # Database Design — Heisenberg Lab
 
-**Status:** Proposed logical model; do not migrate until the owner approves this schema design.
+**Status:** Approved logical model for CP-004, CP-006, CP-007, and CP-008; use additive migrations only.
 **ORM:** Drizzle ORM / Drizzle Kit. **Database:** PostgreSQL approved by CP-001 and CP-003.
 
 ## Principles
@@ -23,7 +23,7 @@ users (1) ------ (N) auth_sessions
                          +--- (0..1) equipment selection
 
 operators (1) ---- (N) sessions
-equipment is a catalog resource; occupancy is pending policy.
+equipment is optionally referenced by sessions; V1 does not reserve or occupy it.
 ```
 
 ## Tables (logical schema, not migration code)
@@ -61,56 +61,52 @@ Set `expires_at` to exactly 7 days after session creation. Multiple active sessi
 
 Operators are game data, not authenticated users.
 
-### `equipment` — fictional catalog resources
-The catalog identity and display fields are in scope. Status, condition, ownership, and allocation fields are intentionally not finalized. Reservation/release behavior must be approved before adding occupancy constraints or lifecycle columns.
+### `sessions` — user-owned simulation sessions
+Session setup/lifecycle is approved by CP-007 and engine behavior by CP-008. Fields are:
 
-### `recipes` and `recipe_steps`
-Recipe Management V1 is approved by CP-005. `recipes` is an authenticated user-owned table with a UUID primary key, `user_id` FK -> `users.id` (NOT NULL), required `title`, and server-generated `created_at`/`updated_at` timestamps. `recipe_steps` has a UUID primary key, `recipe_id` FK -> `recipes.id` with cascade delete for unreferenced recipes, required fictional `label`, optional `description`, one-based `step_order`, and UNIQUE(`recipe_id`, `step_order`). A recipe must have at least one step. There is no publication, version-history, or retirement column in V1.
-
-Recipe reads and mutations are scoped by the authenticated user's `user_id`. Recipe updates replace the complete ordered step list in one transaction. Before update or delete, the API must reject the operation if any simulation session references the recipe. The session schema is not yet implemented, so the initial recipe migration does not add a speculative session-reference table; Session Management must add the reference and enforce this rule before sessions can be created.
-
-### `sessions`
 | Field | Type | Constraints / meaning |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK -> users.id; NOT NULL; ownership boundary |
 | `recipe_id` | uuid | FK -> recipes.id; NOT NULL |
 | `operator_id` | uuid | FK -> operators.id; NOT NULL |
-| `equipment_id` | uuid | FK -> equipment.id; NULL or required only after selection policy approval |
-| `status` | text or enum | NOT NULL; approved lifecycle values only |
-| `revision` | integer | NOT NULL, default 0; concurrency proposal |
-| `quality_score` | integer | NULL until completed; 0–100 when set |
-| `started_at` | timestamptz | NULL until started |
-| `ended_at` | timestamptz | NULL until a terminal state, pending timestamp decision |
-| `created_at` | timestamptz | NOT NULL |
-| `updated_at` | timestamptz | NOT NULL |
+| `equipment_id` | integer | Nullable FK -> equipment.id; optional, `ON DELETE SET NULL` |
+| `status` | varchar | `DRAFT`, `READY`, `RUNNING`, `PAUSED`, `ABORTED`, `COMPLETED`, or `FAILED` |
+| `revision` | integer | NOT NULL, default 0; incremented atomically for every lifecycle or accepted turn mutation |
+| `created_at` | timestamptz | NOT NULL, server default |
+| `updated_at` | timestamptz | NOT NULL, server default |
 
-Check score range. `ended_at` versus separate terminal timestamps remains open.
+### `session_steps` — ordered session progress
+Fields are `id` UUID PK, `session_id` FK -> sessions.id with cascade delete, `recipe_step_id` FK -> recipe_steps.id, one-based `step_order`, `status` (`PENDING` or `COMPLETED`), nullable `completed_at`, and server timestamps as needed. Enforce unique `(session_id, recipe_step_id)` and `(session_id, step_order)`, with indexes for ordered session reads.
 
-### `session_steps` and `session_events`
-Retain the existing invariants: one session step per `(session_id, recipe_step_id)`, `PENDING`/`COMPLETED` step status, append-only events with bounded validated payloads, and unique monotonically increasing `sequence` per session. `session_events.actor_id` references the authenticated user when applicable and is nullable for simulator/system events.
+### `session_events` — append-only lifecycle and turn history
+Fields are `id` UUID PK, `session_id` FK -> sessions.id with cascade delete, `actor_id` FK -> users.id, `action`, nullable `from_status`, `to_status`, resulting `revision`, nullable typed `metadata` JSONB, and `created_at`. A unique `(session_id, revision)` constraint prevents duplicate events. Lifecycle events preserve their existing shape; turn events store Zod-validated action, step, modifier, effective probability, and outcome metadata.
+
+### `equipment` — user-owned fictional inventory
+Equipment Management V1 is approved by CP-006. Preserve the existing integer identity key for compatibility and add `user_id` FK -> `users.id` (NOT NULL), required `name`, required validated-label `type`, required validated-label `condition`, required boolean `available`, and server-generated `created_at`. The current database was verified to contain zero equipment rows before adding the required ownership and inventory columns. V1 has no reservation, occupancy, or release columns; those belong to Session Management.
+
+### `recipes` and `recipe_steps`
+Recipe Management V1 is approved by CP-005. `recipes` is an authenticated user-owned table with a UUID primary key, `user_id` FK -> `users.id` (NOT NULL), required `title`, and server-generated `created_at`/`updated_at` timestamps. `recipe_steps` has a UUID primary key, `recipe_id` FK -> `recipes.id` with cascade delete for unreferenced recipes, required fictional `label`, optional `description`, one-based `step_order`, and UNIQUE(`recipe_id`, `step_order`). A recipe must have at least one step. There is no publication, version-history, or retirement column in V1.
+
+Recipe reads and mutations are scoped by the authenticated user's `user_id`. Recipe updates replace the complete ordered step list in one transaction. Before update or delete, the API must reject the operation if any simulation session references the recipe. The session schema is not yet implemented, so the initial recipe migration does not add a speculative session-reference table; Session Management must add the reference and enforce this rule before sessions can be created.
 
 ## Ownership and query rules
 - Every session list, detail, event, report, and mutation query must scope through the verified authenticated `user_id`.
 - `operator_id` is a domain relationship only and must not be accepted as proof of access.
-- Public versus authenticated visibility of recipes, operators, and equipment is an API decision to approve per feature; user-owned session data is protected.
+- Recipe and equipment inventory queries are authenticated and owner-scoped under CP-005 and CP-006. Operators remain a separate per-feature visibility decision; user-owned session data is protected.
 
 ## Migration and existing repository state
-The repository currently contains one Drizzle migration creating an `equipment` table with an integer identity key. This is observed scaffold state, not approval of the final logical schema, and it is not evidence that a database has been applied. Before implementation, inspect whether any database contains data. If migration is required, preserve existing records through an additive/backfill or compatibility migration approved for the actual data; never drop, reset, or silently discard rows. Do not edit the existing applied migration.
+The repository contains versioned Drizzle migrations through `0005_simulation_engine`, including the additive session and engine tables. Migration application status must still be verified against the target database before claiming deployment. Preserve existing records through additive/backfill or compatibility migrations; never drop, reset, or silently discard rows. Do not edit an already-applied migration.
 
 ## Transaction and migration policies
-- Create session, initialize steps, and append `SESSION_CREATED` atomically.
+- Create session and append `SESSION_CREATED` atomically. Initialize engine step rows atomically during `READY -> RUNNING`; pre-engine `RUNNING`/`PAUSED` sessions use safe idempotent initialization without resetting history.
 - State transitions, step changes, event append, and revision increment are atomic.
-- Use row locking or conditional updates once the revision contract is approved; a read-then-write check alone is insufficient.
+- Use a row lock or conditional revision update; a read-then-write check alone is insufficient.
 - Generate versioned Drizzle migrations and test fresh plus representative pre-migration databases when applicable.
 - Do not add speculative inventory, warehouse, incident catalog, or allocation tables before their behavior is approved.
 
 ## Pending checkpoints
-1. Approve this account/operator relationship and logical schema.
-2. Approve status representation and session terminal timestamp semantics.
-3. Authentication security policy is defined by CP-004; implementation remains gated on formal CP-004 approval.
-4. Approve equipment fields, selection requirement, occupancy, reservation, and release semantics.
-5. Approve optimistic revision and retry/idempotency semantics.
-6. Approve whether unresolved incidents need persisted state beyond events.
+1. Equipment reservation/release remains deferred to a future Session Management decision.
+2. Incidents, scoring, quality reports, retries, and other gameplay beyond CP-008 remain deferred.
 
 Record decisions in `docs/context/checkpoints/`; feature delivery logs belong in `docs/context/update/`.

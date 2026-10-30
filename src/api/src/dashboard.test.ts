@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { inArray, like, sql } from "drizzle-orm";
+import { eq, inArray, like, sql } from "drizzle-orm";
 import { authSessions, db, equipment, users } from "@heisenberg/db";
 import app from "./index";
 
@@ -46,9 +46,11 @@ describe("Dashboard", () => {
         recentActivity: { available: boolean; items: unknown[] };
       };
     };
+    const registeredUser = (await registration.clone().json()) as { data: { id: string } };
     const [equipmentCount] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(equipment);
+      .from(equipment)
+      .where(eq(equipment.userId, registeredUser.data.id));
 
     expect(payload.data.equipment).toEqual({
       available: true,

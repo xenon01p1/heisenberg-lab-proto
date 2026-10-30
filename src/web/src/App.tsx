@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { dashboardSummarySchema, publicUserSchema, type DashboardSummary, type PublicUser, type Recipe, type RecipeStepInput } from "@heisenberg/contracts";
+import { dashboardSummarySchema, publicUserSchema, type DashboardSummary, type Equipment, type Operator, type PublicUser, type Recipe, type RecipeStepInput, type Session, type SessionProgress, type SimulationAction } from "@heisenberg/contracts";
 import { dashboardHasAvailableActivity, dashboardMetricDescription, dashboardMetricValue } from "./dashboard";
 import { getProfileFields } from "./profile";
 import { emptyRecipeStep, recipeFromPayload, recipesFromPayload } from "./recipes";
+import { equipmentFromPayload, equipmentItemFromPayload } from "./equipment";
+import { operatorsFromPayload, sessionAdvanceFromPayload, sessionFromPayload, sessionProgressFromPayload, sessionsFromPayload } from "./sessions";
 
 type AuthMode = "login" | "register";
 type ShellSection = "dashboard" | "profile" | "recipes" | "equipment" | "sessions";
@@ -292,8 +294,8 @@ function ApplicationShell({
               <span className="header-kicker">Workspace / {activeItem.label}</span>
               <h1 id="shell-page-title">{activeItem.label}</h1>
             </div>
-            <span className={`coming-soon-badge${activeSection === "recipes" ? " is-live" : ""}`}>
-              {activeSection === "recipes" ? "Live" : "Placeholder"}
+            <span className={`coming-soon-badge${["recipes", "equipment", "sessions"].includes(activeSection) ? " is-live" : ""}`}>
+              {["recipes", "equipment", "sessions"].includes(activeSection) ? "Live" : "Placeholder"}
             </span>
           </div>
 
@@ -305,6 +307,10 @@ function ApplicationShell({
             <ProfileView onSessionExpired={onSessionExpired} />
           ) : activeSection === "recipes" ? (
             <RecipeView onSessionExpired={onSessionExpired} />
+          ) : activeSection === "equipment" ? (
+            <EquipmentView onSessionExpired={onSessionExpired} />
+          ) : activeSection === "sessions" ? (
+            <SessionView onSessionExpired={onSessionExpired} />
           ) : (
             <section className="placeholder-panel" aria-describedby="placeholder-description">
               <span className="placeholder-icon" aria-hidden="true">{activeItem.label.slice(0, 1)}</span>
@@ -314,6 +320,374 @@ function ApplicationShell({
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function EquipmentView({ onSessionExpired }: { onSessionExpired: () => void }) {
+  const [items, setItems] = useState<import("@heisenberg/contracts").Equipment[]>([]);
+  const [selected, setSelected] = useState<import("@heisenberg/contracts").Equipment | null>(null);
+  const [name, setName] = useState("");
+  const [type, setType] = useState("");
+  const [condition, setCondition] = useState("");
+  const [available, setAvailable] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    async function loadEquipment() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch("/api/equipment", { credentials: "include" });
+        const payload = await readApiPayload(response);
+        if (response.status === 401) {
+          onSessionExpired();
+          return;
+        }
+        if (!response.ok) throw new Error(errorMessage(payload, "Unable to load equipment."));
+        const loaded = equipmentFromPayload(payload);
+        if (!loaded) throw new Error("The equipment response was invalid.");
+        if (active) setItems(loaded);
+      } catch (requestError) {
+        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load equipment.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void loadEquipment();
+    return () => { active = false; };
+  }, [onSessionExpired, retryKey]);
+
+  function resetForm() {
+    setSelected(null);
+    setName("");
+    setType("");
+    setCondition("");
+    setAvailable(true);
+    setError(null);
+  }
+
+  function editItem(item: import("@heisenberg/contracts").Equipment) {
+    setSelected(item);
+    setName(item.name);
+    setType(item.type);
+    setCondition(item.condition);
+    setAvailable(item.available);
+    setError(null);
+  }
+
+  async function saveItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    if (!name.trim() || !type.trim() || !condition.trim()) {
+      setError("Enter a name, type, and condition.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(selected ? `/api/equipment/${selected.id}` : "/api/equipment", {
+        method: selected ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), type: type.trim(), condition: condition.trim(), available }),
+      });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      const saved = equipmentItemFromPayload(payload);
+      if (!response.ok || !saved) throw new Error(errorMessage(payload, "Unable to save equipment."));
+      setItems((current) => selected ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
+      editItem(saved);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to save equipment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeItem(item: import("@heisenberg/contracts").Equipment) {
+    if (!window.confirm(`Delete ${item.name}?`)) return;
+    setError(null);
+    try {
+      const response = await fetch(`/api/equipment/${item.id}`, { method: "DELETE", credentials: "include" });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      if (!response.ok) throw new Error(errorMessage(payload, "Unable to delete equipment."));
+      setItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      if (selected?.id === item.id) resetForm();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to delete equipment.");
+    }
+  }
+
+  if (loading) return <section className="equipment-panel" aria-live="polite">Loading equipment...</section>;
+
+  return (
+    <div className="equipment-view">
+      {error ? <p className="error-message" role="alert">{error}</p> : null}
+      <div className="equipment-layout">
+        <section className="equipment-panel" aria-labelledby="equipment-list-title">
+          <div className="dashboard-section-heading">
+            <div><span className="header-kicker">Owned inventory</span><h2 id="equipment-list-title">Your equipment</h2></div>
+            <button className="secondary-button" type="button" onClick={resetForm}>New item</button>
+          </div>
+          {items.length === 0 ? <p className="muted">No equipment yet. Add your first fictional inventory item.</p> : (
+            <div className="equipment-list">
+              {items.map((item) => (
+                <article className={`equipment-list-item${selected?.id === item.id ? " is-selected" : ""}`} key={item.id}>
+                  <button className="equipment-select-button" type="button" onClick={() => editItem(item)}>
+                    <strong>{item.name}</strong><span>{item.type} · {item.condition}</span>
+                  </button>
+                  <span className={`availability-badge${item.available ? " is-available" : ""}`}>{item.available ? "Available" : "Unavailable"}</span>
+                  <button className="danger-text-button" type="button" onClick={() => void removeItem(item)}>Delete</button>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="equipment-panel" aria-labelledby="equipment-editor-title">
+          <div className="dashboard-section-heading"><div><span className="header-kicker">Inventory editor</span><h2 id="equipment-editor-title">{selected ? "Edit equipment" : "Add equipment"}</h2></div></div>
+          <form className="equipment-form" onSubmit={(event) => void saveItem(event)}>
+            <label htmlFor="equipment-name">Name</label><input id="equipment-name" value={name} maxLength={255} onChange={(event) => setName(event.target.value)} required />
+            <label htmlFor="equipment-type">Type</label><input id="equipment-type" value={type} maxLength={100} onChange={(event) => setType(event.target.value)} required />
+            <label htmlFor="equipment-condition">Condition</label><input id="equipment-condition" value={condition} maxLength={100} onChange={(event) => setCondition(event.target.value)} required />
+            <label className="availability-toggle"><input type="checkbox" checked={available} onChange={(event) => setAvailable(event.target.checked)} /> Available in inventory</label>
+            <button type="submit" disabled={saving}>{saving ? "Saving..." : selected ? "Save changes" : "Add equipment"}</button>
+          </form>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SessionView({ onSessionExpired }: { onSessionExpired: () => void }) {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [selected, setSelected] = useState<Session | null>(null);
+  const [progress, setProgress] = useState<SessionProgress | null>(null);
+  const [lastOutcome, setLastOutcome] = useState<{ success: boolean; action: SimulationAction; effectiveProbability: number; equipmentModifier: number } | null>(null);
+  const [recipeId, setRecipeId] = useState("");
+  const [operatorId, setOperatorId] = useState("");
+  const [equipmentId, setEquipmentId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSessionData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const responses = await Promise.all([
+          fetch("/api/sessions", { credentials: "include" }),
+          fetch("/api/recipes", { credentials: "include" }),
+          fetch("/api/operators", { credentials: "include" }),
+          fetch("/api/equipment", { credentials: "include" }),
+        ]);
+        const payloads = await Promise.all(responses.map(readApiPayload));
+        if (responses.some((response) => response.status === 401)) {
+          onSessionExpired();
+          return;
+        }
+        if (responses.some((response) => !response.ok)) throw new Error("Unable to load session setup data.");
+        const loadedSessions = sessionsFromPayload(payloads[0]);
+        const loadedRecipes = recipesFromPayload(payloads[1]);
+        const loadedOperators = operatorsFromPayload(payloads[2]);
+        const loadedEquipment = equipmentFromPayload(payloads[3]);
+        if (!loadedSessions || !loadedRecipes || !loadedOperators || !loadedEquipment) throw new Error("A session setup response was invalid.");
+        if (active) {
+          setSessions(loadedSessions);
+          setRecipes(loadedRecipes);
+          setOperators(loadedOperators);
+          setEquipment(loadedEquipment);
+          setRecipeId((current) => current || loadedRecipes[0]?.id || "");
+          setOperatorId((current) => current || loadedOperators[0]?.id || "");
+        }
+      } catch (requestError) {
+        if (active) setError(requestError instanceof Error ? requestError.message : "Unable to load sessions.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void loadSessionData();
+    return () => { active = false; };
+  }, [onSessionExpired, retryKey]);
+
+  async function selectSession(session: Session) {
+    setError(null);
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, { credentials: "include" });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      const detail = sessionFromPayload(payload);
+      if (!response.ok || !detail) throw new Error(errorMessage(payload, "Unable to load session."));
+      setSelected(detail);
+      await loadProgress(detail.id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to load session.");
+    }
+  }
+
+  async function loadProgress(sessionId: string) {
+    const response = await fetch(`/api/sessions/${sessionId}/progress`, { credentials: "include" });
+    const payload = await readApiPayload(response);
+    if (response.status === 401) { onSessionExpired(); return; }
+    const loaded = sessionProgressFromPayload(payload);
+    if (!response.ok || !loaded) throw new Error(errorMessage(payload, "Unable to load session progress."));
+    setProgress(loaded);
+  }
+
+  async function createNewSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    if (!recipeId || !operatorId) {
+      setError("Select a recipe and operator before creating a session.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId, operatorId, equipmentId: equipmentId ? Number(equipmentId) : null }),
+      });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      const created = sessionFromPayload(payload);
+      if (!response.ok || !created) throw new Error(errorMessage(payload, "Unable to create session."));
+      setSessions((current) => [created, ...current]);
+      setSelected(created);
+      await loadProgress(created.id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to create session.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runAction(action: "prepare" | "start" | "pause" | "resume" | "abort") {
+    if (!selected) return;
+    setError(null);
+    try {
+      const response = await fetch(`/api/sessions/${selected.id}/${action}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedRevision: selected.revision }),
+      });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      const updated = sessionFromPayload(payload);
+      if (!response.ok || !updated) throw new Error(errorMessage(payload, "Unable to update session."));
+      setSelected(updated);
+      setSessions((current) => current.map((session) => session.id === updated.id ? updated : session));
+      await loadProgress(updated.id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to update session.");
+    }
+  }
+
+  async function advance(action: SimulationAction) {
+    if (!selected || !progress || advancing) return;
+    setAdvancing(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/sessions/${selected.id}/advance`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedRevision: progress.revision, action }),
+      });
+      const payload = await readApiPayload(response);
+      if (response.status === 401) { onSessionExpired(); return; }
+      const result = sessionAdvanceFromPayload(payload);
+      if (!response.ok || !result) throw new Error(errorMessage(payload, "Unable to resolve turn."));
+      setProgress(result.progress);
+      setSessions((current) => current.map((session) => session.id === selected.id ? { ...session, status: result.progress.status, revision: result.progress.revision } : session));
+      await selectSession({ ...selected, status: result.progress.status, revision: result.progress.revision });
+      setLastOutcome(result.outcome);
+    } catch (requestError) {
+      if (requestError instanceof Error) setError(requestError.message);
+      else setError("Unable to resolve turn.");
+      if (selected) {
+        try { await loadProgress(selected.id); } catch { /* preserve the original error */ }
+      }
+    } finally {
+      setAdvancing(false);
+    }
+  }
+
+  if (loading) return <section className="session-panel" aria-live="polite">Loading sessions...</section>;
+
+  return (
+    <div className="session-view">
+      {error ? <p className="error-message" role="alert">{error}</p> : null}
+      <div className="session-layout">
+        <section className="session-panel" aria-labelledby="session-list-title">
+          <div className="dashboard-section-heading"><div><span className="header-kicker">Pre-gameplay workspace</span><h2 id="session-list-title">Your sessions</h2></div></div>
+          {sessions.length === 0 ? <p className="muted">No sessions yet. Set up your first session below.</p> : (
+            <div className="session-list">
+              {sessions.map((session) => (
+                <button className={`session-list-item${selected?.id === session.id ? " is-selected" : ""}`} type="button" key={session.id} onClick={() => { setLastOutcome(null); void selectSession(session); }}>
+                  <strong>{session.recipeTitle}</strong><span>{session.operator.displayName}</span><em>{session.status}</em>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="session-panel" aria-labelledby="session-create-title">
+          <div className="dashboard-section-heading"><div><span className="header-kicker">Setup</span><h2 id="session-create-title">Create a draft</h2></div></div>
+          <form className="session-form" onSubmit={(event) => void createNewSession(event)}>
+            <label htmlFor="session-recipe">Recipe</label>
+            <select id="session-recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)} required>
+              <option value="">Select a recipe</option>{recipes.map((recipe) => <option value={recipe.id} key={recipe.id}>{recipe.title}</option>)}
+            </select>
+            <label htmlFor="session-operator">Operator</label>
+            <select id="session-operator" value={operatorId} onChange={(event) => setOperatorId(event.target.value)} required>
+              <option value="">Select an operator</option>{operators.map((operator) => <option value={operator.id} key={operator.id}>{operator.displayName}</option>)}
+            </select>
+            <label htmlFor="session-equipment">Equipment <span className="muted">(optional, not reserved)</span></label>
+            <select id="session-equipment" value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)}>
+              <option value="">No equipment</option>{equipment.map((item) => <option value={item.id} key={item.id}>{item.name} — {item.available ? "Available" : "Unavailable"}</option>)}
+            </select>
+            <button type="submit" disabled={saving || recipes.length === 0 || operators.length === 0}>{saving ? "Creating..." : "Create draft session"}</button>
+          </form>
+        </section>
+      </div>
+      {selected ? (
+        <section className="session-panel session-detail" aria-labelledby="session-detail-title">
+          <div className="dashboard-section-heading"><div><span className="header-kicker">Session detail</span><h2 id="session-detail-title">{selected.recipeTitle}</h2></div><span className="session-status">{selected.status}</span></div>
+          <dl className="session-fields"><div><dt>Operator</dt><dd>{selected.operator.displayName}</dd></div><div><dt>Equipment</dt><dd>{selected.equipmentName ?? "None selected"}</dd></div><div><dt>Revision</dt><dd>{selected.revision}</dd></div></dl>
+          <div className="session-actions">
+            {selected.status === "DRAFT" ? <button type="button" onClick={() => void runAction("prepare")}>Prepare</button> : null}
+            {selected.status === "READY" ? <button type="button" onClick={() => void runAction("start")}>Start</button> : null}
+            {selected.status === "RUNNING" ? <button type="button" onClick={() => void runAction("pause")}>Pause</button> : null}
+            {selected.status === "PAUSED" ? <button type="button" onClick={() => void runAction("resume")}>Resume</button> : null}
+            {!["ABORTED", "COMPLETED", "FAILED"].includes(selected.status) ? <button className="danger-action" type="button" onClick={() => void runAction("abort")}>Abort</button> : null}
+          </div>
+          {progress ? (
+            <div className="simulation-progress" aria-live="polite">
+              <div className="dashboard-section-heading"><div><span className="header-kicker">Simulation Engine</span><h3>Step progress</h3></div><span className="session-status">{progress.completedSteps}/{progress.totalSteps}</span></div>
+              {progress.nextStep ? <p className="current-step"><strong>Next fictional step:</strong> {progress.nextStep.label}{progress.nextStep.description ? ` — ${progress.nextStep.description}` : ""}</p> : <p className="muted">No unfinished steps remain.</p>}
+              {selected.status === "PAUSED" ? <p className="muted">Resume the session before choosing an action.</p> : null}
+              {selected.status === "FAILED" ? <p className="error-message">This session failed. The failed step remains unfinished; retry is not available in V1.</p> : null}
+              {selected.status === "COMPLETED" ? <p className="success-message">This fictional session is complete.</p> : null}
+              {lastOutcome ? <p className={lastOutcome.success ? "success-message" : "error-message"} role="status">{lastOutcome.success ? "Turn succeeded" : "Turn failed"}: {lastOutcome.action} at {lastOutcome.effectiveProbability}% effective probability ({lastOutcome.equipmentModifier >= 0 ? "+" : ""}{lastOutcome.equipmentModifier}% equipment modifier).</p> : null}
+              {progress.availableActions.length > 0 ? <div className="simulation-actions"><p className="muted">Choose an abstract action. Base probabilities: Careful 85%, Balanced 75%, Bold 65%. Available selected equipment adds 5 percentage points, capped at 95%.</p>{progress.availableActions.map((action) => <button type="button" key={action} disabled={advancing} onClick={() => void advance(action)}>{advancing ? "Resolving..." : action}</button>)}</div> : null}
+            </div>
+          ) : null}
+          <div className="session-events"><h3>Lifecycle events</h3><ol>{(selected.events ?? []).map((event) => <li key={event.id}><strong>{event.action}</strong> — {event.fromStatus ?? "new"} → {event.toStatus} <span>revision {event.revision}</span></li>)}</ol></div>
+        </section>
+      ) : null}
     </div>
   );
 }

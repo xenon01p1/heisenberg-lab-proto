@@ -699,6 +699,285 @@ button:disabled {
   font-weight: 800;
 }
 
+.equipment-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.equipment-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) minmax(0, 1.1fr);
+  gap: 1rem;
+}
+
+.equipment-panel {
+  min-width: 0;
+  border: 1px solid rgba(142, 228, 214, 0.18);
+  border-radius: 1rem;
+  background: rgba(20, 31, 41, 0.78);
+  padding: clamp(1.15rem, 3vw, 1.75rem);
+}
+
+.equipment-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.equipment-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(142, 228, 214, 0.12);
+  border-radius: 0.7rem;
+  padding: 0.35rem;
+}
+
+.equipment-list-item.is-selected {
+  border-color: rgba(142, 228, 214, 0.45);
+  background: rgba(142, 228, 214, 0.08);
+}
+
+.equipment-select-button {
+  display: grid;
+  flex: 1;
+  gap: 0.25rem;
+  background: transparent;
+  color: #e8edf2;
+  padding: 0.55rem;
+  text-align: left;
+}
+
+.equipment-select-button span {
+  color: #8ea0ad;
+  font-size: 0.78rem;
+}
+
+.availability-badge {
+  border-radius: 999px;
+  background: rgba(239, 112, 112, 0.13);
+  color: #ffb8b8;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+}
+
+.availability-badge.is-available {
+  background: rgba(142, 228, 214, 0.13);
+  color: #8ee4d6;
+}
+
+.equipment-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.equipment-form > input {
+  width: 100%;
+  border: 1px solid #40515f;
+  border-radius: 0.6rem;
+  background: #0e151c;
+  color: #f4f8fb;
+  padding: 0.7rem 0.8rem;
+}
+
+.equipment-form > label:not(.availability-toggle) {
+  color: #d8e2e9;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.availability-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.4rem 0;
+  color: #d8e2e9;
+}
+
+.equipment-form > button[type="submit"] {
+  background: #8ee4d6;
+  color: #102026;
+  padding: 0.75rem 1rem;
+}
+
+.session-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.session-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.9fr) minmax(0, 1.1fr);
+  gap: 1rem;
+}
+
+.session-panel {
+  min-width: 0;
+  border: 1px solid rgba(142, 228, 214, 0.18);
+  border-radius: 1rem;
+  background: rgba(20, 31, 41, 0.78);
+  padding: clamp(1.15rem, 3vw, 1.75rem);
+}
+
+.session-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.session-list-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 0.65rem;
+  border: 1px solid rgba(142, 228, 214, 0.12);
+  border-radius: 0.7rem;
+  background: transparent;
+  color: #e8edf2;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.session-list-item:hover,
+.session-list-item.is-selected {
+  border-color: rgba(142, 228, 214, 0.45);
+  background: rgba(142, 228, 214, 0.08);
+}
+
+.session-list-item span {
+  color: #8ea0ad;
+  font-size: 0.78rem;
+}
+
+.session-list-item em {
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #8ee4d6;
+  font-size: 0.7rem;
+  font-style: normal;
+  letter-spacing: 0.05em;
+}
+
+.session-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.session-form label {
+  color: #d8e2e9;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.session-form select {
+  width: 100%;
+  border: 1px solid #40515f;
+  border-radius: 0.6rem;
+  background: #0e151c;
+  color: #f4f8fb;
+  padding: 0.7rem 0.8rem;
+}
+
+.session-form > button,
+.session-actions button {
+  background: #8ee4d6;
+  color: #102026;
+  padding: 0.7rem 0.9rem;
+}
+
+.session-status {
+  border-radius: 999px;
+  background: rgba(142, 228, 214, 0.13);
+  color: #8ee4d6;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.session-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+
+.session-fields div {
+  border-top: 1px solid rgba(142, 228, 214, 0.12);
+  padding-top: 0.7rem;
+}
+
+.session-fields dt {
+  color: #7f929f;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.session-fields dd {
+  margin: 0.3rem 0 0;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.session-actions .danger-action {
+  background: rgba(239, 112, 112, 0.16);
+  color: #ffb8b8;
+}
+
+.session-events {
+  margin-top: 1.5rem;
+}
+
+.simulation-progress {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.current-step {
+  margin: 0.75rem 0;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+}
+
+.simulation-actions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.simulation-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.success-message {
+  color: #126b45;
+}
+
+.session-events h3 {
+  font-size: 1rem;
+}
+
+.session-events ol {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.session-events li {
+  color: #aab8c4;
+}
+
+.session-events li span {
+  color: #7f929f;
+  font-size: 0.8rem;
+}
+
 .sidebar-backdrop {
   display: none;
 }
@@ -718,6 +997,18 @@ button:disabled {
 
 @media (max-width: 760px) {
   .recipe-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .equipment-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .session-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .session-fields {
     grid-template-columns: 1fr;
   }
 

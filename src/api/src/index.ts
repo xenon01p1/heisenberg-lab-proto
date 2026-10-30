@@ -1,15 +1,45 @@
 import { Hono } from "hono";
 import { checkDatabaseConnection } from "@heisenberg/db";
-import { authCredentialsSchema, recipeInputSchema } from "@heisenberg/contracts";
+import {
+  authCredentialsSchema,
+  equipmentInputSchema,
+  recipeInputSchema,
+  sessionAdvanceSchema,
+  sessionActionSchema,
+  sessionCreateSchema,
+} from "@heisenberg/contracts";
 import { getDashboardSummary } from "./dashboard";
 import {
   createRecipe,
   deleteRecipe,
   getRecipe,
   listRecipes,
+  RecipeInUseError,
   RecipeNotFoundError,
   updateRecipe,
 } from "./recipes";
+import {
+  createEquipment,
+  deleteEquipment,
+  EquipmentNotFoundError,
+  getEquipment,
+  listEquipment,
+  updateEquipment,
+} from "./equipment";
+import {
+  createSession,
+  getSession,
+  getSessionEvents,
+  listOperators,
+  listSessions,
+  SessionInvalidTransitionError,
+  SessionNotFoundError,
+  SessionReferenceError,
+  SessionRevisionConflictError,
+  advanceSession,
+  transitionSession,
+  getSessionProgress,
+} from "./sessions";
 import {
   DuplicateEmailError,
   clearAuthenticationCookie,
@@ -31,6 +61,16 @@ function validationError(message = "Request validation failed.") {
       message,
     },
   };
+}
+
+function equipmentIdFromParam(value: string): number | null {
+  if (!/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 app.get("/health", (c) => {
@@ -79,6 +119,196 @@ app.get("/recipes", requireAuthentication, async (c) => {
     );
   }
 });
+
+app.get("/equipment", requireAuthentication, async (c) => {
+  try {
+    return c.json({ data: await listEquipment(c.get("user").id) });
+  } catch (error) {
+    console.error("Equipment list failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load equipment." } }, 500);
+  }
+});
+
+app.post("/equipment", validateOrigin, requireAuthentication, async (c) => {
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(validationError(), 400);
+  }
+  const parsed = equipmentInputSchema.safeParse(input);
+  if (!parsed.success) return c.json(validationError("Equipment name, type, condition, and availability are required."), 400);
+  try {
+    return c.json({ data: await createEquipment(c.get("user").id, parsed.data) }, 201);
+  } catch (error) {
+    console.error("Equipment creation failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to create equipment." } }, 500);
+  }
+});
+
+app.get("/equipment/:id", requireAuthentication, async (c) => {
+  const equipmentId = equipmentIdFromParam(c.req.param("id"));
+  if (equipmentId === null) return c.json(validationError("Equipment ID must be a positive integer."), 400);
+  try {
+    return c.json({ data: await getEquipment(c.get("user").id, equipmentId) });
+  } catch (error) {
+    if (error instanceof EquipmentNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Equipment not found." } }, 404);
+    console.error("Equipment detail failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load equipment." } }, 500);
+  }
+});
+
+app.patch("/equipment/:id", validateOrigin, requireAuthentication, async (c) => {
+  const equipmentId = equipmentIdFromParam(c.req.param("id"));
+  if (equipmentId === null) return c.json(validationError("Equipment ID must be a positive integer."), 400);
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(validationError(), 400);
+  }
+  const parsed = equipmentInputSchema.safeParse(input);
+  if (!parsed.success) return c.json(validationError("Equipment name, type, condition, and availability are required."), 400);
+  try {
+    return c.json({ data: await updateEquipment(c.get("user").id, equipmentId, parsed.data) });
+  } catch (error) {
+    if (error instanceof EquipmentNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Equipment not found." } }, 404);
+    console.error("Equipment update failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to update equipment." } }, 500);
+  }
+});
+
+app.delete("/equipment/:id", validateOrigin, requireAuthentication, async (c) => {
+  const equipmentId = equipmentIdFromParam(c.req.param("id"));
+  if (equipmentId === null) return c.json(validationError("Equipment ID must be a positive integer."), 400);
+  try {
+    await deleteEquipment(c.get("user").id, equipmentId);
+    return c.body(null, 204);
+  } catch (error) {
+    if (error instanceof EquipmentNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Equipment not found." } }, 404);
+    console.error("Equipment deletion failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to delete equipment." } }, 500);
+  }
+});
+
+app.get("/operators", requireAuthentication, async (c) => {
+  try {
+    return c.json({ data: await listOperators() });
+  } catch (error) {
+    console.error("Operator list failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load operators." } }, 500);
+  }
+});
+
+app.get("/sessions", requireAuthentication, async (c) => {
+  try {
+    return c.json({ data: await listSessions(c.get("user").id) });
+  } catch (error) {
+    console.error("Session list failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load sessions." } }, 500);
+  }
+});
+
+app.post("/sessions", validateOrigin, requireAuthentication, async (c) => {
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(validationError(), 400);
+  }
+  const parsed = sessionCreateSchema.safeParse(input);
+  if (!parsed.success) return c.json(validationError("A valid recipe, operator, and optional equipment are required."), 400);
+  try {
+    return c.json({ data: await createSession(c.get("user").id, parsed.data) }, 201);
+  } catch (error) {
+    if (error instanceof SessionReferenceError) return c.json({ error: { code: "BUSINESS_RULE_VIOLATION", message: "The selected recipe, operator, or equipment is not valid." } }, 422);
+    console.error("Session creation failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to create session." } }, 500);
+  }
+});
+
+app.get("/sessions/:id", requireAuthentication, async (c) => {
+  const sessionId = c.req.param("id");
+  if (!isUuid(sessionId)) return c.json(validationError("Session ID must be a UUID."), 400);
+  try {
+    return c.json({ data: await getSession(c.get("user").id, sessionId) });
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Session not found." } }, 404);
+    console.error("Session detail failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load session." } }, 500);
+  }
+});
+
+app.get("/sessions/:id/events", requireAuthentication, async (c) => {
+  const sessionId = c.req.param("id");
+  if (!isUuid(sessionId)) return c.json(validationError("Session ID must be a UUID."), 400);
+  try {
+    return c.json({ data: await getSessionEvents(c.get("user").id, sessionId) });
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Session not found." } }, 404);
+    console.error("Session events failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load session events." } }, 500);
+  }
+});
+
+app.get("/sessions/:id/progress", requireAuthentication, async (c) => {
+  const sessionId = c.req.param("id");
+  if (!isUuid(sessionId)) return c.json(validationError("Session ID must be a UUID."), 400);
+  try {
+    return c.json({ data: await getSessionProgress(c.get("user").id, sessionId) });
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Session not found." } }, 404);
+    console.error("Session progress failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to load session progress." } }, 500);
+  }
+});
+
+app.post("/sessions/:id/advance", validateOrigin, requireAuthentication, async (c) => {
+  const sessionId = c.req.param("id");
+  if (!isUuid(sessionId)) return c.json(validationError("Session ID must be a UUID."), 400);
+  let input: unknown;
+  try {
+    input = await c.req.json();
+  } catch {
+    return c.json(validationError("expectedRevision and action are required."), 400);
+  }
+  const parsed = sessionAdvanceSchema.safeParse(input);
+  if (!parsed.success) return c.json(validationError("expectedRevision and a valid action are required."), 400);
+  try {
+    const result = await advanceSession(c.get("user").id, sessionId, parsed.data);
+    return c.json({ data: { ...result.progress, outcome: result.outcome } });
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Session not found." } }, 404);
+    if (error instanceof SessionRevisionConflictError) return c.json({ error: { code: "REVISION_CONFLICT", message: "The session changed; reload before trying again." } }, 409);
+    if (error instanceof SessionInvalidTransitionError) return c.json({ error: { code: "INVALID_STATE_TRANSITION", message: "That session cannot advance from its current status." } }, 409);
+    console.error("Session advance failed:", error);
+    return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to advance session." } }, 500);
+  }
+});
+
+for (const action of ["prepare", "start", "pause", "resume", "abort"] as const) {
+  app.post(`/sessions/:id/${action}`, validateOrigin, requireAuthentication, async (c) => {
+    const sessionId = c.req.param("id");
+    if (!isUuid(sessionId)) return c.json(validationError("Session ID must be a UUID."), 400);
+    let input: unknown;
+    try {
+      input = await c.req.json();
+    } catch {
+      return c.json(validationError("expectedRevision is required."), 400);
+    }
+    const parsed = sessionActionSchema.safeParse(input);
+    if (!parsed.success) return c.json(validationError("expectedRevision is required."), 400);
+    try {
+      return c.json({ data: await transitionSession(c.get("user").id, sessionId, action, parsed.data) });
+    } catch (error) {
+      if (error instanceof SessionNotFoundError) return c.json({ error: { code: "NOT_FOUND", message: "Session not found." } }, 404);
+      if (error instanceof SessionRevisionConflictError) return c.json({ error: { code: "REVISION_CONFLICT", message: "The session changed; reload before trying again." } }, 409);
+      if (error instanceof SessionInvalidTransitionError) return c.json({ error: { code: "INVALID_STATE_TRANSITION", message: "That action is not allowed from the current status." } }, 409);
+      console.error(`Session ${action} failed:`, error);
+      return c.json({ error: { code: "INTERNAL_ERROR", message: "Unable to update session." } }, 500);
+    }
+  });
+}
 
 app.post("/recipes", validateOrigin, requireAuthentication, async (c) => {
   let input: unknown;
@@ -139,6 +369,9 @@ app.patch("/recipes/:id", validateOrigin, requireAuthentication, async (c) => {
     if (error instanceof RecipeNotFoundError) {
       return c.json({ error: { code: "NOT_FOUND", message: "Recipe not found." } }, 404);
     }
+    if (error instanceof RecipeInUseError) {
+      return c.json({ error: { code: "BUSINESS_RULE_VIOLATION", message: "Referenced recipes cannot be changed." } }, 422);
+    }
     console.error("Recipe update failed:", error);
     return c.json(
       { error: { code: "INTERNAL_ERROR", message: "Unable to update recipe." } },
@@ -154,6 +387,9 @@ app.delete("/recipes/:id", validateOrigin, requireAuthentication, async (c) => {
   } catch (error) {
     if (error instanceof RecipeNotFoundError) {
       return c.json({ error: { code: "NOT_FOUND", message: "Recipe not found." } }, 404);
+    }
+    if (error instanceof RecipeInUseError) {
+      return c.json({ error: { code: "BUSINESS_RULE_VIOLATION", message: "Referenced recipes cannot be deleted." } }, 422);
     }
     console.error("Recipe deletion failed:", error);
     return c.json(

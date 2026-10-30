@@ -21,8 +21,8 @@
 - Editable profile fields and account-management scope.
 - Dashboard metric definitions.
 - Recipe create/edit/delete and versioning policy were unresolved here and are superseded for Recipe Management V1 by CP-005. V1 uses owner-scoped mutable recipes that become immutable after session reference; no publication workflow or version history.
-- Equipment status/condition vocabulary, allocation/release rules.
-- Session transition matrix, idempotency/revision handling, incident and scoring rules.
+- Equipment status/condition vocabulary and allocation/release rules were unresolved here and are superseded for inventory fields by CP-006. Reservation, occupancy, and release remain deferred to Session Management.
+- Session transition, revision, operator, and pre-gameplay lifecycle rules are approved for Session Management V1 by CP-007. Gameplay, incidents, scoring, and reports remain deferred.
 - UI routing, styling framework, component library, and final visual tokens.
 
 ## Consequences

@@ -1,14 +1,14 @@
 # Business Rules — Heisenberg Lab
 
-**Status:** Proposed V1 specification — owner approval required before implementation.
+**Status:** Approved V1 rules for Authentication, Session Management, and Simulation Engine under CP-004, CP-007, and CP-008.
 **Scope:** Authenticated, turn-based, fictional cooking-session game. No real chemistry, drug manufacturing, or purity measurement.
 
 ## Product vocabulary
 - **User/account:** An authenticated email/password account persisted in PostgreSQL. It is the security principal and owner of user-scoped records.
 - **Operator:** A seeded fictional game persona selected for a session. Operators are not accounts and are not authorization principals.
 - **Recipe:** A user-owned fictional game workflow with a title and ordered abstract steps. It is mutable until a simulation session references it, then immutable for historical consistency.
-- **Session:** One user-owned attempt to execute one recipe version with one fictional operator and, if approved for the session contract, selected equipment.
-- **Equipment:** A fictional catalog resource. Catalog visibility and session selection are in V1 scope; reservation and release semantics remain pending.
+- **Session:** One user-owned attempt associated with one owned recipe, one seeded fictional operator, and optional owned equipment. Session Management owns setup/lifecycle; the approved Simulation Engine owns turn progress and terminal `COMPLETED`/`FAILED` outcomes.
+- **Equipment:** A user-owned fictional inventory item with a name, type label, condition label, and inventory availability flag. Reservation and release semantics remain deferred.
 - **Recipe step / session step:** An ordered abstract stage and its progress record.
 - **Incident:** A fictional game event that interrupts or affects a session.
 - **Quality score:** A game score from 0–100; never call it real chemical purity.
@@ -29,40 +29,37 @@
 - One session at a time per player UI, while the backend may retain multiple sessions for the account.
 - Turn-based only: no background timer, cron, WebSocket, or automatic advancement.
 - A recipe and its steps cannot be updated or deleted after a session references it. V1 has no publication workflow or version history; the session task must preserve the referenced definition.
-- Equipment catalog and planned session selection are in scope. Whether active sessions reserve equipment, when it is released, and which statuses/conditions exist require an owner checkpoint.
+- Equipment inventory CRUD is in scope under CP-006. `available` is an inventory flag only; CP-007 explicitly does not reserve, occupy, or release equipment during Session Management V1.
 - No raw-material consumption, warehouse, pricing, real chemical reactions, or distribution.
 
 ## Session lifecycle
-The lifecycle below remains the proposed CP-002/CP-003 domain model and requires approval before transition implementation:
+CP-007 approves the following setup and lifecycle actions. CP-008 additionally authorizes engine-owned terminal outcomes:
 
 | From | Action | To | Guard |
 |---|---|---|---|
-| DRAFT | prepare | READY | Recipe has >=1 ordered step; operator exists |
-| DRAFT | cancel | ABORTED | No work started |
-| READY | start | RUNNING | Has recipe snapshot/immutable version and initialized steps |
-| READY | cancel | ABORTED | Not started |
-| RUNNING | pause | PAUSED | Explicit user action or blocking incident |
-| PAUSED | resume | RUNNING | Blocking incident resolved, if any |
-| RUNNING | advance | RUNNING | Completes current step; more steps remain |
-| RUNNING | advance | COMPLETED | Completes final step; calculates final game score |
-| RUNNING / PAUSED | abort | ABORTED | User confirms irreversible action |
-| RUNNING | fail | FAILED | Explicit simulated terminal failure |
+| DRAFT | prepare | READY | Recipe and operator references remain valid |
+| READY | start | RUNNING | Explicit user action; no equipment reservation |
+| RUNNING | pause | PAUSED | Explicit user action |
+| PAUSED | resume | RUNNING | Explicit user action |
+| DRAFT / READY / RUNNING / PAUSED | abort | ABORTED | Explicit user action |
 
-`COMPLETED`, `FAILED`, and `ABORTED` are terminal. No mutation except audit annotations expressly authorized later. `prepare` may be omitted as a separate button in the UI, but the state transition remains explicit on the server. Do not invent extra states.
+`ABORTED`, `COMPLETED`, and `FAILED` are terminal. Session lifecycle commands cannot advance, resume, or restart a terminal session. The Simulation Engine creates `COMPLETED` after the final successful step and `FAILED` after a failed turn; no retry is available in V1.
 
 ## Creating a session
-1. An authenticated user selects an existing published fictional recipe version, a seeded operator, and equipment only if the approved session contract requires selection.
-2. The server creates a `DRAFT` session owned by the authenticated user and initializes associated session steps in one transaction.
-3. Recipe, operator, and any selected equipment references are fixed after the session starts; equipment occupancy behavior is not implied by this rule.
+1. An authenticated user selects an owned recipe, a seeded operator, and optional owned equipment.
+2. The server creates a `DRAFT` session owned by the authenticated user and records `SESSION_CREATED` in one transaction.
+3. Recipe, operator, and any selected equipment references are fixed for this pre-gameplay session record; equipment occupancy behavior is not implied by this rule.
 4. Creating a session does not start or advance it.
 
-## Turn advancement
-- Only a `RUNNING` session may advance.
-- Advance operates on the first unfinished step in `step_order`.
-- One successful advance completes exactly one step, records an event, and moves to the next step or completes the session.
-- The client must never supply authoritative step order, result, or quality score.
-- Revision/conflict protection and true retry idempotency are pending decisions; duplicate commands must not complete a second step accidentally.
-- A command must update session/step state and append its event in one transaction.
+## Turn advancement (CP-008 approved)
+- Only a `RUNNING` session with an unfinished `session_step` may advance.
+- The server initializes missing progress rows idempotently for pre-engine `RUNNING`/`PAUSED` sessions without changing lifecycle history.
+- The player chooses exactly one of `CAUTIOUS` (85%), `BALANCED` (75%), or `BOLD` (65%). Available selected equipment adds five percentage points; the result is clamped to 5%–95%. No equipment is reserved or mutated.
+- The server performs one controlled random draw per accepted command. Clients cannot provide the step, probability, draw, result, or progress index.
+- A success completes exactly the next unfinished step. The final success atomically changes the session to `COMPLETED`; other successes leave it `RUNNING`.
+- A failure atomically changes the session to `FAILED`, leaves the failed step unfinished, and persists the failed outcome. There is no retry or restart.
+- Every accepted turn increments `revision` and appends one event. State, step, and event changes are transactional.
+- `expectedRevision` is checked before state validity. A mismatch returns `REVISION_CONFLICT` without a draw or mutation; a matching revision with a non-advanceable state returns `INVALID_STATE_TRANSITION`.
 
 ## Incidents and scoring
 - V1 supports no incident or scoring algorithm until the owner approves the deterministic warning and scoring rules from the relevant checkpoint.
@@ -80,10 +77,6 @@ The lifecycle below remains the proposed CP-002/CP-003 domain model and requires
 - Errors are explicit and actionable, but do not leak internals.
 
 ## Open checkpoints requiring owner decision
-1. Approve the lifecycle table, including `READY` and `FAILED`.
-2. Approve revision-based conflict protection and duplicate-request behavior.
-3. Approve equipment status/condition vocabulary, selection requirements, reservation, and release semantics.
-4. Approve deterministic incidents and whether they are V1 or V1.1.
-5. Approve game scoring rules or keep scoring unspecified until a later task.
+1. Define future incidents, scoring, quality reports, and other gameplay beyond the CP-008 engine.
 
 Record decisions in `docs/context/checkpoints/`, not `docs/update/`. Once approved, update this file's status and remove contradictory open questions; keep historical checkpoint records intact.

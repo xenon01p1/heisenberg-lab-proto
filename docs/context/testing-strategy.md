@@ -1,6 +1,6 @@
 # Testing Strategy — Heisenberg Lab
 
-**Status:** Proposed strategy; Bun Test is approved for Authentication by CP-004. The project-wide test runner and other feature-specific tooling remain undecided.
+**Status:** Proposed strategy; Bun Test is approved for Authentication by CP-004 and Simulation Engine V1 by CP-008. The project-wide test runner and other feature-specific tooling remain undecided.
 
 ## Objectives
 Demonstrate correctness of state transitions, persistence, deterministic game outcomes, and concurrency behavior. Tests should be readable, fast, and useful when an AI agent changes the code.
@@ -20,11 +20,11 @@ Prefer unit and service tests first; do not create a large E2E framework solely 
 1. Registration stores only a password hash, login establishes a server session, logout revokes it, and expired/revoked sessions are denied.
 2. Authenticated account A cannot read or mutate account B's sessions or related records; fictional operator IDs do not bypass ownership.
 3. React registration/login, protected-shell, profile, and dashboard states handle loading, validation, empty, and error outcomes.
-4. Session creation initializes one session step per recipe step.
+4. Session start initializes one session step per recipe step, and pre-engine sessions are initialized idempotently without changing lifecycle history.
 5. Draft cannot advance; ready cannot resume; terminal sessions cannot restart.
-6. Advance completes exactly one unfinished step in order.
-7. Final step completes the session and records score exactly once.
-8. Duplicate or concurrent commands using the same revision yield one success and one conflict.
+6. Advance completes exactly one unfinished step in order on success.
+7. Final step completes the session exactly once; a failed turn leaves its step unfinished and makes the session terminal `FAILED`.
+8. Duplicate or concurrent commands using the same revision yield one success and one conflict, with no extra random draw or event.
 9. State and event append commit together; simulated DB failure rolls back both.
 10. Refresh/re-fetch returns persisted state, not browser-only state.
 11. Recipe version changes do not alter existing session meaning.
@@ -36,7 +36,7 @@ Prefer unit and service tests first; do not create a large E2E framework solely 
 ## Determinism
 - Do not use real-time sleeps in tests.
 - Inject a clock or pass explicit timestamps to pure functions when needed.
-- Use fixed fixtures and seeded randomness if random events are added later.
+- Use fixed fixtures and injected controlled randomness for engine outcomes; production randomness must remain server-side.
 - Never rely on external services, internet access, or uncontrolled time in unit tests.
 
 ## Database testing
