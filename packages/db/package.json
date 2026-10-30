@@ -9,5 +9,13 @@
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.11"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:generate": "bun --env-file=../../.env run drizzle-kit generate",
+    "db:migrate": "bun --env-file=../../.env run drizzle-kit migrate",
+    "db:studio": "bun --env-file=../../.env run drizzle-kit studio"
   }
 }

@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@heisenberg/db": "workspace:*",
     "hono": "^4.13.14"
   },
   "scripts": {
-    "dev": "bun --hot src/index.ts"
+    "dev": "bun --env-file=../../.env --hot src/index.ts"
   }
 }
